@@ -1,5 +1,3 @@
-
-# -*- coding: utf-8 -*-
 """
 DataFlow Analyst – Lernspiel für Python Data Analytics
 
@@ -1062,6 +1060,941 @@ LEVELS = [
   }
 ]
 
+
+# ---------------------------------------------------------------------------
+# STORY-DRIVEN MISSION DESIGN
+# ---------------------------------------------------------------------------
+# Die PDF-Beispiele bleiben das technische Lernziel, werden dem Spieler aber
+# nicht mehr als Aufgabe gezeigt. Jede Mission beschreibt eine konkrete
+# Situation, in der das jeweilige Konzept gebraucht wird. Das PDF-Beispiel
+# ist nur noch eine optionale Referenz nach einem eigenen Versuch.
+
+STORY_CONTEXTS = [
+    "Im Data-Operations-Team", "Im Vertriebsreport", "Im Marketing-Dashboard",
+    "Beim Monatsabschluss", "Bei der Datenprüfung", "Im Kundenservice",
+    "Im Lagerreport", "Bei der Kampagnenanalyse", "Im Management-Report",
+    "Beim Import der Tagesdaten", "Im Qualitätssicherungsprozess", "Im Data Lab",
+]
+
+
+def _mission_answer(level, answer, mode="text", keywords=None, title=None, task=None, hint=None):
+    if title:
+        level["title"] = title
+    if task:
+        level["task"] = task
+    if hint:
+        level["hint"] = hint
+    level["answer"] = str(answer)
+    level["answer_mode"] = mode
+    level["keywords"] = keywords or []
+    # Der Originalcode bleibt technisch hinterlegt, wird aber nicht mehr als
+    # eigentliche Aufgabenstellung verwendet.
+    return level
+
+
+def build_story_mission(level, i):
+    c = level.get("pdf_code", "")
+    original_title = level.get("title", "")
+    p = level.get("page", "?")
+    ctx = STORY_CONTEXTS[i % len(STORY_CONTEXTS)]
+
+    # 1–13: Grundlagen / Import / Datenüberblick
+    if c.startswith('print("Text")'):
+        return _mission_answer(level, "Datenimport gestartet", "text", ["print"],
+            "Die Pipeline soll sichtbar reagieren",
+            f"{ctx}: Eine neue Datenpipeline startet. Zeige in der Konsole exakt die Meldung `Datenimport gestartet`, damit das Team sofort erkennt, dass der Prozess angelaufen ist.",
+            "Du brauchst hier noch kein pandas. Überlege, wie Python Text auf der Konsole ausgeben kann.")
+    if c.startswith("variableName ="):
+        return _mission_answer(level, "42", "number", ["=", "variable"],
+            "Eine Kennzahl speichern",
+            "Die Qualitätsabteilung legt einen Prüfwert von 42 fest. Speichere diesen Wert in einer Variable und gib ihn anschließend aus. Die Variable soll `check_value` heißen.",
+            "Eine Variable entsteht durch eine Zuweisung mit `=`.")
+    if "pd.read_csv" in c:
+        return _mission_answer(level, "650", "number", ["read_csv"],
+            "Ein CSV-Export kommt an",
+            f"{ctx}: Die Verkaufsabteilung liefert den täglichen CSV-Export. Lade `data/transactions.csv` in einen DataFrame namens `myData` und finde heraus, wie viele Transaktionen enthalten sind. Untersuche die Datei zuerst nach Bedarf.",
+            "Zum Einlesen einer CSV-Datei brauchst du pandas und einen Dateipfad.")
+    if "to_csv" in c:
+        return _mission_answer(level, "export.csv", "text", ["to_csv"],
+            "Einen Report exportieren",
+            "Der Teamleiter möchte die aktuell geladene Tabelle als CSV archivieren. Speichere deinen DataFrame als `export.csv` ab und kontrolliere anschließend, ob die Datei erzeugt wurde.",
+            "Suche nach einer DataFrame-Methode, die einen CSV-Export übernimmt.")
+    if c.startswith("del DataFrame"):
+        return _mission_answer(level, "DataFrame gelöscht", "text", ["del"],
+            "Arbeitsplatz aufräumen",
+            "Du hast einen großen temporären DataFrame namens `temp_data` erzeugt. Nach dem Report wird er nicht mehr benötigt. Entferne ihn aus dem Workspace.",
+            "Mit welchem Python-Befehl löscht du eine Variable aus dem Workspace?")
+    if c.startswith("myData.dtypes"):
+        return _mission_answer(level, "Prüfung der Datentypen", "text", ["dtypes"],
+            "Warum rechnet Python plötzlich falsch?",
+            f"{ctx}: Ein Kollege vermutet, dass eine Spalte als Text importiert wurde. Lade die Transaktionen und untersuche die Datentypen aller Spalten. Gib im Antwortfeld `Prüfung der Datentypen` ein, sobald du die Kontrolle durchgeführt hast.",
+            "Gesucht ist eine Übersicht der Datentypen, nicht nur ein einzelner Wert.")
+    if c.startswith("myData.head"):
+        return _mission_answer(level, "Erste 3 Zeilen", "text", ["head"],
+            "Der erste Blick auf Rohdaten",
+            "Bevor du den Report programmierst, möchtest du einen schnellen Blick auf die ersten drei Transaktionen werfen. Zeige genau diese ersten drei Zeilen an.",
+            "Eine pandas-Methode nimmt die gewünschte Anzahl von Zeilen als Argument.")
+    if c.startswith("myData.tail"):
+        return _mission_answer(level, "Letzte 3 Zeilen", "text", ["tail"],
+            "Ist der Export vollständig?",
+            "Kontrolliere die letzten drei Transaktionen des Imports. So kannst du prüfen, ob die Datei am Ende sauber abgeschlossen wurde.",
+            "Es gibt eine Gegenstück-Methode zu `head()` für das Tabellenende.")
+    if c.startswith("myData.describe"):
+        return _mission_answer(level, "Statistische Übersicht", "text", ["describe"],
+            "Schneller Gesundheitscheck",
+            "Die Finance-Abteilung möchte einen schnellen Überblick über die numerischen Felder: Mittelwert, Streuung, Minimum und Maximum. Erzeuge eine statistische Zusammenfassung des DataFrames.",
+            "Pandas kann numerische Spalten mit einer einzigen Methode zusammenfassen.")
+    if "pd.Series" in c and 'dtype="category"' in c:
+        return _mission_answer(level, "category", "text", ["Series", "category"],
+            "Eine Liste wird zu Kategorien",
+            "Du baust eine kleine Statusliste mit den Werten `a`, `b` und `c`. Erzeuge daraus eine pandas Series mit dem Datentyp `category` und prüfe anschließend den Typ.",
+            "Achte darauf, dass hier nicht nur eine normale Liste entsteht, sondern eine kategoriale Series.")
+    if "datetime.datetime" in c:
+        return _mission_answer(level, "2009-10-05", "text", ["datetime"],
+            "Ein Stichtag wird festgelegt",
+            "Für einen historischen Audit muss der Stichtag 5. Oktober 2009 als echtes Python-Datum gespeichert werden. Erzeuge das passende Datumsobjekt.",
+            "Das Ziel ist ein Datumobjekt, kein String.")
+    if "pd.to_datetime" in c:
+        return _mission_answer(level, "Datumsformat konvertiert", "text", ["to_datetime"],
+            "Uneinheitliche Datumswerte",
+            "Ein Alt-Export enthält Datumswerte im Format `TT.MM.JJJJ`. Konvertiere die betroffene Spalte in ein echtes Datum und achte auf die richtige Reihenfolge von Tag und Monat.",
+            "Nutze die pandas-Konvertierung für Datumswerte und gib das Format explizit an.")
+    if c.startswith("myData.loc[row_index"):
+        return _mission_answer(level, "1. Zeile + Customer", "text", ["loc"],
+            "Eine einzelne Zelle prüfen",
+            "Ein Auditor möchte die Customer-ID der ersten Transaktion direkt aus der Tabelle sehen. Greife gezielt auf die erste Zeile und die Spalte `Customer` zu.",
+            "`loc` arbeitet mit Index und Spaltenlabel.")
+
+    # 14–25: Plotting
+    if "plt.hist" in c:
+        return _mission_answer(level, "Histogramm", "text", ["plt.hist"],
+            "Wie verteilt sich der Bestellwert?",
+            "Das Management möchte sehen, wie sich die Einkaufsbeträge verteilen. Erstelle ein Histogramm der Spalte `PurchAmount` mit 10 Klassen.",
+            "Ein Histogramm zeigt die Verteilung einer einzelnen numerischen Variable.")
+    if "plt.scatter" in c:
+        return _mission_answer(level, "Scatterplot", "text", ["scatter"],
+            "Hängen Einkauf und Kosten zusammen?",
+            "Untersuche, ob höhere Einkaufsbeträge mit höheren Kosten zusammen auftreten. Erstelle dazu einen Scatterplot mit `PurchAmount` auf der x-Achse und `Cost` auf der y-Achse.",
+            "Gesucht ist ein Punktdiagramm für zwei Variablen.")
+    if "plt.plot" in c:
+        color = "grün" if '"go"' in c or 'color="green"' in c else ""
+        return _mission_answer(level, "Liniendiagramm", "text", ["plt.plot"],
+            "Eine einfache Zeitreihe sichtbar machen",
+            f"{ctx}: Zeichne eine einfache Punkt-/Liniengrafik aus zwei vorbereiteten Zahlenreihen. Die Darstellung soll{' grüne Marker' if color else ''} verwenden.",
+            "`plot()` kann Datenreihen und Marker darstellen. Du darfst die Darstellung selbst aufbauen.")
+    if c.startswith("plt.show"):
+        return _mission_answer(level, "Diagramm angezeigt", "text", ["plt.show"],
+            "Der Report soll wirklich erscheinen",
+            "Du hast einen Plot vorbereitet, aber im Team sieht niemand etwas. Sorge dafür, dass die aktuelle Matplotlib-Grafik tatsächlich angezeigt bzw. abgeschlossen wird.",
+            "Es gibt einen klassischen Befehl zum Anzeigen vorbereiteter Matplotlib-Grafiken.")
+    if c.startswith("plt.xlabel"):
+        return _mission_answer(level, "Purchase Amount", "text", ["xlabel"],
+            "Die x-Achse beschriften",
+            "Im Management-Chart muss die x-Achse klar sagen, dass dort der Einkaufsbetrag steht. Beschrifte die x-Achse mit `Purchase Amount` und formatiere die Beschriftung sichtbar hervorgehoben.",
+            "Überlege, welche Matplotlib-Funktion die x-Achsenbeschriftung setzt.")
+    if c.startswith("plt.ylabel"):
+        return _mission_answer(level, "Cost", "text", ["ylabel"],
+            "Die y-Achse beschriften",
+            "Beschrifte die y-Achse des Kosten-Charts mit `Cost` und formatiere die Beschriftung passend zum Bericht.",
+            "Die Funktion für die y-Achse ähnelt der für die x-Achse.")
+    if c.startswith("plt.title"):
+        return _mission_answer(level, "Costs by Purchase Amount", "text", ["title"],
+            "Ein Chart braucht einen verständlichen Titel",
+            "Der Bericht soll sofort erkennen lassen, was der Plot zeigt. Setze den Titel `Costs by Purchase Amount` und formatiere ihn deutlich.",
+            "Der Titel wird direkt an die aktuelle Matplotlib-Achse gesetzt.")
+    if c.startswith("plt.xlim") or c.startswith("plt.ylim"):
+        return _mission_answer(level, "Achsenbereich begrenzt", "text", ["xlim", "ylim"],
+            "Ein Ausreißer sprengt die Grafik",
+            "Für einen Management-Chart sollen die Achsen bewusst auf einen festen Wertebereich begrenzt werden. Setze mindestens eine x- und eine y-Grenze sinnvoll für einen 0–500-Report.",
+            "Matplotlib bietet dafür jeweils eine eigene Grenzfunktion.")
+    if c.startswith("plt.text"):
+        return _mission_answer(level, "Hinweis im Plot", "text", ["plt.text"],
+            "Eine Warnung direkt am Datenpunkt",
+            "Markiere einen auffälligen Bereich im Chart mit dem Text `Achtung: hoher Wert`. Platziere die Meldung direkt an einer geeigneten Koordinate.",
+            "Text kann direkt innerhalb der Plot-Fläche platziert werden.")
+    if c.startswith("plt.subplot"):
+        return _mission_answer(level, "2 Teilgrafiken", "text", ["subplot"],
+            "Zwei Charts auf einem Bericht",
+            "Der Teamleiter möchte zwei unterschiedliche Ansichten nebeneinander in einem gemeinsamen Figure-Bereich. Teile die Fläche dafür in 1 Zeile und 2 Spalten und aktiviere die erste Teilgrafik.",
+            "Denk an ein Raster aus Zeilen, Spalten und einer Position.")
+    if c.startswith("plt.suptitle"):
+        return _mission_answer(level, "Monatsreport", "text", ["suptitle"],
+            "Ein gemeinsamer Titel für mehrere Charts",
+            "Über mehreren Teilgrafiken soll der gemeinsame Titel `Monatsreport` stehen. Setze diesen Haupttitel.",
+            "Für einen Titel über der gesamten Figure gibt es eine eigene Matplotlib-Funktion.")
+
+    # 26–51: DataFrame-Eigenschaften, Selektion und Filter
+    if c == "myData.shape" and i == 25:
+        return _mission_answer(level, "650", "number", ["shape[0]"],
+            "Wie viele Transaktionen kamen an?",
+            "Der Import ist angekommen. Ermittle nur die Anzahl der Zeilen des DataFrames. Antworte anschließend mit der Zahl.",
+            "`shape` enthält zwei Dimensionen: Zeilen und Spalten.")
+    if c == "myData.shape" and i == 26:
+        return _mission_answer(level, "7", "number", ["shape[1]"],
+            "Wie viele Felder hat die Tabelle?",
+            "Für die Dokumentation brauchst du nur die Anzahl der Spalten des Transaktions-DataFrames. Ermittle diese Anzahl.",
+            "Die zweite Dimension von `shape` beschreibt die Spaltenzahl.")
+    if "columns.values" in c:
+        return _mission_answer(level, "Customer", "text", ["columns"],
+            "Wie heißt der Kundenschlüssel?",
+            "Ein Kollege kennt die Spaltennamen nicht. Liste sie auf und trage als Antwort den Namen der Kundenspalte ein.",
+            "Du kannst die Spaltenübersicht direkt aus dem DataFrame auslesen.")
+    if c.startswith("len([2, 3, 5])"):
+        return _mission_answer(level, "3", "number", ["len"],
+            "Ein kleines Kontrollobjekt",
+            "Ein Testscript prüft die Länge einer kleinen Liste `[2, 3, 5]`. Gib die Anzahl der Elemente aus.",
+            "`len()` liefert die Anzahl der Elemente.")
+    if c.startswith('len("hello")'):
+        return _mission_answer(level, "5", "number", ["len"],
+            "String-Länge prüfen",
+            "Ein Eingabefeld enthält den Text `hello`. Ermittle, wie viele Zeichen der String enthält.",
+            "Auch Strings besitzen eine Länge.")
+    if "iloc[0" in c and "iloc[0:3" not in c and "iloc[0:5" not in c:
+        return _mission_answer(level, "1. Zeile", "text", ["iloc"],
+            "Die erste Transaktion inspizieren",
+            "Der Auditor möchte die allererste Zeile des DataFrames als Positionsselektion sehen. Nutze eine indexbasierte Auswahl.",
+            "`iloc` selektiert über Positionen, nicht über Spaltennamen.")
+    if "iloc[0:3" in c:
+        return _mission_answer(level, "3 Zeilen", "text", ["iloc"],
+            "Die ersten drei Fälle extrahieren",
+            "Extrahiere genau die ersten drei Zeilen über ihre Positionen. Das Ergebnis soll ein DataFrame bleiben.",
+            "Beim Slicing ist die rechte Grenze ausgeschlossen.")
+    if "iloc[0:5" in c:
+        return _mission_answer(level, "5 Zeilen", "text", ["iloc"],
+            "Eine kleine Stichprobe",
+            "Für einen Kontrollreport brauchst du die ersten fünf Datensätze. Selektiere sie nur über ihre Positionen.",
+            "Position 0 bis vor 5 ergibt fünf Zeilen.")
+    if "iloc[0:0" in c:
+        return _mission_answer(level, "Leerer DataFrame", "text", ["iloc"],
+            "Nur die Tabellenstruktur behalten",
+            "Erzeuge einen leeren DataFrame ohne Datenzeilen, aber mit denselben Spalten wie die Ausgangstabelle. Das ist nützlich, wenn ein leerer Export vorbereitet werden soll.",
+            "Ein Slice mit identischem Start und Ende erzeugt keine Zeilen.")
+    if "iloc[[0, 1, 2, 4]" in c:
+        return _mission_answer(level, "4 Zeilen", "text", ["iloc"],
+            "Vier konkrete Fälle auswählen",
+            "Ein Auditor möchte gezielt die Fälle mit den Positionsnummern 0, 1, 2 und 4 sehen. Selektiere genau diese vier Zeilen.",
+            "Bei mehreren Positionen wird eine Liste von Indizes verwendet.")
+    if "len(myData)-1" in c:
+        return _mission_answer(level, "Letzte Zeile", "text", ["iloc", "len"],
+            "Den letzten Datensatz finden",
+            "Finde den allerletzten Datensatz allein aus der aktuellen DataFrame-Länge und einer positionsbasierten Auswahl.",
+            "Der letzte Index ist immer um eins kleiner als die Länge.")
+    if c.startswith("myData.tail(1)"):
+        return _mission_answer(level, "1 Zeile", "text", ["tail"],
+            "Schnell den letzten Fall holen",
+            "Zeige nur den letzten Datensatz des Imports. Verwende dafür die passende Komfortmethode.",
+            "Du kannst dieselbe Aufgabe auch mit einem negativen bzw. letzten Index lösen.")
+    if 'sort_values(["TransDate", "Customer"], ascending=[0, 0])' in c:
+        return _mission_answer(level, "Absteigend nach Datum und Kunde", "text", ["sort_values", "ascending"],
+            "Den neuesten Kundenkontakt zuerst",
+            "Für einen Eskalationsreport sollen die neuesten Transaktionen zuerst erscheinen. Sortiere primär nach Datum und sekundär nach Customer – beide absteigend.",
+            "`ascending` kann eine eigene Einstellung für mehrere Sortierspalten erhalten.")
+    if 'sort_values(["TransDate", "Customer"])' in c:
+        return _mission_answer(level, "Datum + Kunde", "text", ["sort_values"],
+            "Transaktionen chronologisch ordnen",
+            "Ordne die Transaktionen zuerst nach Datum und bei gleichem Datum nach Customer. Lass die Standardreihenfolge aufsteigend.",
+            "Mehrere Sortierspalten werden als Liste übergeben.")
+    if 'sort_values(["TransDate"])' in c:
+        return _mission_answer(level, "Chronologisch sortiert", "text", ["sort_values"],
+            "Ein chronologischer Report",
+            "Der Tagesreport soll in zeitlicher Reihenfolge laufen. Sortiere die Transaktionen nach `TransDate`.",
+            "Gesucht ist die pandas-Sortiermethode für Werte in einer Spalte.")
+    if 'PurchAmount"] > 100' in c and 'Customer' not in c and 'TransDate' not in c:
+        return _mission_answer(level, "Bestellungen über 100", "text", ["loc", "PurchAmount", "> 100"],
+            "Welche Käufe sind größer als 100?",
+            "Die Finance-Abteilung möchte nur Transaktionen mit einem `PurchAmount` über 100 sehen. Filtere die Zeilen entsprechend.",
+            "Mit `loc` kannst du eine boolesche Bedingung direkt auf Zeilen anwenden.")
+    if 'Customer"] == 149332' in c:
+        return _mission_answer(level, "Customer 149332", "text", ["loc", "Customer"],
+            "Einen bestimmten Kunden auditieren",
+            "Das Audit nennt die Kundennummer 149332. Zeige alle Transaktionen dieses Kunden.",
+            "Hier brauchst du einen Vergleich mit `==`.")
+    if 'Customer"].isin([149332, 172951])' in c and '~' not in c:
+        return _mission_answer(level, "2 Kunden", "text", ["isin"],
+            "Zwei Kunden gemeinsam untersuchen",
+            "Der Audit-Fall betrifft die Kunden 149332 und 172951. Filtere alle Zeilen für genau diese beiden IDs.",
+            "`isin()` ist praktisch, wenn mehrere erlaubte Werte vorliegen.")
+    if '~myData["Customer"].isin([149332, 172951])' in c:
+        return _mission_answer(level, "Alle anderen Kunden", "text", ["isin", "~"],
+            "Den Audit-Fall ausblenden",
+            "Für einen Vergleich sollen die Kunden 149332 und 172951 ausgeschlossen werden. Filtere alle anderen Kunden heraus.",
+            "Mit `~` kannst du eine boolesche Bedingung negieren.")
+    if 'TransDate"] > pd.to_datetime' in c and 'PurchAmount"] > 100' in c:
+        return _mission_answer(level, "Datum UND Betrag", "text", ["loc", "to_datetime", "&"],
+            "Zwei Bedingungen gleichzeitig",
+            "Die Krisenanalyse interessiert sich nur für Käufe nach dem 24.10.2007 und gleichzeitig über 100. Formuliere beide Bedingungen in einem Filter.",
+            "Mehrere pandas-Bedingungen werden mit `&` verbunden; jede Bedingung sollte geklammert werden.")
+    if c.startswith("myData.loc[") and c.strip() in ("myData.loc[",):
+        return _mission_answer(level, "loc", "text", ["loc"],
+            "Eine Auswahl als Arbeitsauftrag",
+            "Der Audit-Export verlangt eine explizite labelbasierte Auswahl von Zeilen bzw. Spalten. Verwende `loc` und zeige im Output, dass die Auswahl funktioniert.",
+            "`loc` steht für labelbasierte Auswahl.")
+    if c.startswith("myData.iloc[") and c.strip() in ("myData.iloc[",):
+        return _mission_answer(level, "iloc", "text", ["iloc"],
+            "Eine Auswahl über Position",
+            "Der Audit-Export verlangt eine positionsbasierte Auswahl. Verwende `iloc` und demonstriere im Output die ausgewählten Daten.",
+            "`iloc` steht für Auswahl über Positionsnummern.")
+    if c.startswith('myData["TransDate"]'):
+        return _mission_answer(level, "TransDate", "text", ["[\"TransDate\"]"],
+            "Nur eine Spalte herausziehen",
+            "Für eine Datumsprüfung brauchst du ausschließlich die Spalte `TransDate`. Wähle genau diese Series aus.",
+            "Die kürzeste pandas-Schreibweise für eine einzelne Spalte verwendet eckige Klammern.")
+    if '[["Customer", "TransDate", "PurchAmount"]]' in c:
+        return _mission_answer(level, "3 Spalten", "text", ["Customer", "TransDate", "PurchAmount"],
+            "Die Kernspalten des Reports",
+            "Der Management-Report braucht nur Kunde, Datum und Einkaufsbetrag. Erstelle einen DataFrame mit genau diesen drei Spalten.",
+            "Für mehrere Spalten verwendest du eine Liste innerhalb der Auswahl.")
+    if 'PurchAmount"] > 100, ["TransDate", "Cost"]' in c:
+        return _mission_answer(level, "2 Spalten", "text", ["loc", "PurchAmount", "Cost"],
+            "Nur die relevanten Felder behalten",
+            "Für Transaktionen über 100 sollen im Export nur `TransDate` und `Cost` enthalten sein. Filtere und selektiere beides in einem Schritt.",
+            "`loc[Zeilenbedingung, Spaltenliste]` kombiniert beide Operationen.")
+    if '[["TransDate", "Cost"]].loc' in c:
+        return _mission_answer(level, "2 Spalten nach Filter", "text", ["loc", "TransDate", "Cost"],
+            "Erst Felder wählen, dann filtern",
+            "Baue einen kleinen Export, der zunächst nur `TransDate` und `Cost` enthält und anschließend nur Käufe über 100 behält.",
+            "Pandas erlaubt auch die umgekehrte Reihenfolge: erst Spalten wählen, dann filtern.")
+    if 'append(pd.DataFrame' in c:
+        return _mission_answer(level, "Neue Zeile", "text", ["concat", "DataFrame"],
+            "Eine nachgemeldete Transaktion kommt herein",
+            "Ein nachträglich gemeldeter Kauf muss an den vorhandenen Transaktions-DataFrame angehängt werden. Füge eine neue Zeile hinzu und erhalte die Spaltenstruktur.",
+            "In modernen pandas-Versionen ist `concat()` der passende Ersatz für das alte `append()`-Beispiel.")
+    if 'drop(myData.index[0:3]' in c:
+        return _mission_answer(level, "3 Zeilen entfernt", "text", ["drop", "index"],
+            "Ein fehlerhafter Header muss weg",
+            "Die ersten drei importierten Zeilen gehören zu einem Testlauf und sollen aus der Arbeitstabelle entfernt werden. Lösche sie direkt aus dem DataFrame.",
+            "`drop()` kann gezielt Zeilen über ihren Index entfernen.")
+    if 'NewCol' in c and '.round()' in c:
+        return _mission_answer(level, "NewCol", "text", ["round", "NewCol"],
+            "Eine gerundete Berichtsspalte",
+            "Für einen kompakteren Report soll eine neue Spalte `NewCol` entstehen, in der die Werte aus `Cost` auf ganze Zahlen gerundet werden.",
+            "Erzeuge eine neue Spalte aus einer bestehenden Series und wende danach eine Rundung an.")
+    if c.startswith('myData_modified = myData') and '.copy' not in c:
+        return _mission_answer(level, "Referenz", "text", ["=", "myData_modified"],
+            "Ein Kollege erstellt einen Alias",
+            "Zeige den Unterschied einer einfachen Zuweisung: Erzeuge `myData_modified` als zweite Referenz auf den bestehenden DataFrame und prüfe, was diese Art Zuweisung bedeutet.",
+            "Eine einfache Zuweisung erzeugt nicht automatisch eine physische Kopie.")
+    if '.copy()' in c:
+        return _mission_answer(level, "Unabhängige Kopie", "text", ["copy()"],
+            "Ein sicherer Arbeitsstand",
+            "Du willst einen DataFrame verändern, ohne das Original zu beschädigen. Erstelle deshalb eine echte Kopie in `myData_modified`.",
+            "Pandas stellt dafür eine eigene Methode bereit.")
+    if c.startswith('del myData["Quantity"]'):
+        return _mission_answer(level, "Quantity entfernt", "text", ["del"],
+            "Eine unnötige Spalte raus",
+            "Ein Export darf die technische Spalte `Quantity` nicht enthalten. Entferne sie direkt aus dem DataFrame.",
+            "Spalten können ebenfalls direkt mit `del` entfernt werden.")
+    if 'drop(["Quantity", "Cost"], axis=1)' in c:
+        return _mission_answer(level, "2 Spalten entfernt", "text", ["drop", "axis=1"],
+            "Interne Spalten aus dem Export entfernen",
+            "Für den Kundenexport werden die internen Spalten `Quantity` und `Cost` nicht benötigt. Entferne beide spaltenweise.",
+            "Bei `drop()` steht `axis=1` für Spalten.")
+    if 'rename(columns' in c:
+        return _mission_answer(level, "TransValue", "text", ["rename"],
+            "Ein lesbarer Spaltenname",
+            "Im internen Reporting soll `PurchAmount` künftig `TransValue` heißen. Benenne die Spalte entsprechend um.",
+            "Verwende die pandas-Methode zum Umbenennen von Spalten.")
+
+    # 60–75: Aggregation
+    if 'groupby("Customer")' in c and 'PurchAmount' in c and 'max' in c:
+        return _mission_answer(level, "Kunden-Summe + Max", "text", ["groupby", "max"],
+            "Wer hat hohe Einzelkäufe?",
+            "Erstelle pro Kunde zwei Kennzahlen: die gesamte Kaufsumme und den höchsten einzelnen Einkaufsbetrag.",
+            "Eine Gruppe kann dieselbe Ausgangsspalte mit mehreren Aggregationen auswerten.")
+    if 'groupby("Customer")' in c and 'AggQuant' in c:
+        return _mission_answer(level, "Kundenumsatz + Menge", "text", ["groupby", "sum"],
+            "Umsatz und Stückzahl pro Kunde",
+            "Der CRM-Report soll für jeden Kunden gleichzeitig den gesamten Einkaufsbetrag und die gesamte Menge ausweisen.",
+            "Mit `agg()` kannst du mehrere Kennzahlen in einem Schritt erzeugen.")
+    if 'groupby(["Customer", "TransDate"])' in c:
+        return _mission_answer(level, "Kunde + Datum", "text", ["groupby", "Customer", "TransDate"],
+            "Tagesumsatz je Kunde",
+            "Für eine Reklamation brauchst du den Einkaufsbetrag gruppiert nach Kunde und Transaktionsdatum.",
+            "Mehrere Gruppierungsdimensionen werden als Liste angegeben.")
+    if 'myData.iloc[1:5].groupby("Customer")' in c:
+        return _mission_answer(level, "4 ausgewählte Zeilen aggregiert", "text", ["iloc", "groupby"],
+            "Nur ein Teil des Imports",
+            "Analysiere nur die Zeilen mit Position 1 bis 4 und bilde darin die Kaufsumme pro Kunde.",
+            "Die Reihenfolge ist wichtig: zuerst Zeilen auswählen, dann gruppieren.")
+    if c.startswith('myData["PurchAmount"].sum()'):
+        return _mission_answer(level, "Gesamtsumme", "text", ["sum"],
+            "Was wurde insgesamt umgesetzt?",
+            "Der Monatsreport braucht die gesamte Summe der `PurchAmount`-Spalte. Ermittle genau diese eine Kennzahl.",
+            "Eine Series kann direkt aggregiert werden.")
+    if c.startswith("sum(), min(), max(), mean()"):
+        return _mission_answer(level, "mean / std / sum / min / max", "text", ["mean", "std", "sum", "min", "max"],
+            "Ein Kennzahlen-Kasten",
+            "Baue einen kleinen Kennzahlen-Check für ein numerisches Feld. Ermittle mindestens Summe, Minimum, Maximum, Mittelwert und Standardabweichung.",
+            "Pandas und NumPy stellen mehrere Standardaggregationen bereit.")
+    if 'transform(sum)' in c:
+        return _mission_answer(level, "Kundensumme je Zeile", "text", ["transform"],
+            "Jede Transaktion soll den Kundenumsatz kennen",
+            "Der Kundenservice möchte in jeder einzelnen Transaktionszeile zusätzlich sehen, wie hoch die gesamte Kaufsumme dieses Kunden ist. Erzeuge dafür eine neue Spalte, ohne die Zeilenanzahl zu verändern.",
+            "`transform()` ist geeignet, wenn das Ergebnis wieder auf die Originalzeilen verteilt werden soll.")
+    if 'to_period("M")' in c:
+        return _mission_answer(level, "Monatssummen", "text", ["to_period", "groupby"],
+            "Umsatz nach Monaten",
+            "Das Management will den gesamten Einkaufsbetrag je Kalendermonat sehen. Verwandle das Transaktionsdatum in eine Monatsperiode und aggregiere danach.",
+            "Die Datumswerte müssen zuerst in ein Monatsformat überführt werden.")
+    if 'lambda x' in c:
+        return _mission_answer(level, "Nur Kunden über 100", "text", ["lambda", "groupby"],
+            "Kunden mit relevantem Umsatz herausfiltern",
+            "Erstelle zuerst die Kaufsumme pro Kunde und filtere anschließend direkt in derselben Ausdruckskette alle Kunden mit mindestens 100 Umsatz.",
+            "Das PDF zeigt hier Chaining plus eine Lambda-Funktion als Filter.")
+    if 'sort_values(["Customer", "TransDate"]).groupby("Customer").head(3)' in c:
+        return _mission_answer(level, "3 erste Käufe je Kunde", "text", ["sort_values", "groupby", "head"],
+            "Die drei frühesten Käufe pro Kunde",
+            "Für eine Kohortenanalyse brauchst du pro Kunde nur die drei zeitlich frühesten Transaktionen. Sortiere zuerst und wähle dann die ersten drei je Kunde.",
+            "Die Sortierung muss vor dem `groupby(...).head(3)` passieren.")
+    if 'sort_values(["Customer", "TransDate"]).groupby("Customer").tail(1)' in c:
+        return _mission_answer(level, "Letzter Kauf je Kunde", "text", ["sort_values", "groupby", "tail"],
+            "Der letzte Kontakt pro Kunde",
+            "Für das CRM brauchst du pro Kunde jeweils die letzte Transaktion. Sortiere nach Kunde und Datum und nimm dann den letzten Datensatz jeder Gruppe.",
+            "Wieder ist die Reihenfolge aus Sortierung und Gruppierung entscheidend.")
+    if 'transform("count")' in c:
+        return _mission_answer(level, "Transaktionsanzahl je Kunde", "text", ["transform", "count"],
+            "Wie oft hat jeder Kunde bestellt?",
+            "Ergänze jede Transaktionszeile um die Anzahl aller Transaktionen dieses Kunden.",
+            "`transform(""count"")` verteilt die Gruppengröße auf die Originalzeilen.")
+    if '.cumcount() + 1' in c:
+        return _mission_answer(level, "1, 2, 3, ...", "text", ["cumcount"],
+            "Die Reihenfolge der Käufe nummerieren",
+            "Nummeriere die Käufe jedes Kunden chronologisch ab 1. So kann der CRM-Report später vom ersten, zweiten und dritten Kauf sprechen.",
+            "`cumcount()` startet bei 0; überlege, wie du bei 1 beginnst.")
+    if '.shift(periods=1)' in c:
+        return _mission_answer(level, "Vorherige Kosten je Kunde", "text", ["shift"],
+            "Was kostete der vorherige Kauf?",
+            "Für jede Transaktion soll zusätzlich der Kostenwert der vorherigen Transaktion desselben Kunden sichtbar sein.",
+            "Innerhalb jeder Kundengruppe kann `shift()` eine zeitverzögerte Spalte erzeugen.")
+    if '.cumsum()' in c:
+        return _mission_answer(level, "Kumulierte Kosten", "text", ["cumsum"],
+            "Wie viel hat sich je Kunde aufsummiert?",
+            "Erstelle für jeden Kunden eine laufende Summe der bisherigen `Cost`-Werte über die Transaktionen.",
+            "`cumsum()` berechnet eine kumulierte Summe.")
+
+    # 76–101: Seaborn / fortgeschrittenes Plotting
+    if 'distplot' in c:
+        mode = "KDE" if 'hist=False' in c else "Histogramm"
+        return _mission_answer(level, mode, "text", ["sns.distplot"],
+            "Eine Verteilung grafisch prüfen",
+            f"Das Data-Quality-Team möchte die Verteilung eines numerischen Feldes visuell kontrollieren. Erstelle eine Seaborn-Verteilungsgrafik als {mode}-Variante.",
+            "`distplot` ist das ältere Seaborn-Beispiel aus dem Skript. Moderne Seaborn-Versionen bieten dafür kompatible Alternativen.")
+    if 'lmplot' in c or 'regplot' in c:
+        if 'order=2' in c:
+            return _mission_answer(level, "Quadratische Trendkurve", "text", ["regplot", "order=2"],
+                "Ein nichtlinearer Zusammenhang",
+                "Prüfe, ob der Zusammenhang zwischen Einkaufsbetrag und Kosten eher gekrümmt als linear ist. Erstelle einen Scatterplot und lege eine Kurve 2. Ordnung darüber.",
+                "Mit `order=2` kann eine quadratische Trendkurve dargestellt werden.")
+        if 'fit_reg=False' in c:
+            return _mission_answer(level, "Scatter ohne Regressionslinie", "text", ["lmplot", "regplot", "fit_reg=False"],
+                "Nur die Punkte zeigen",
+                "Marketing möchte den Rohzusammenhang zwischen `PurchAmount` und `Cost` sehen, ohne Regressionslinie.",
+                "Schalte die Regressionslinie gezielt aus.")
+        if 'hue="Quantity"' in c:
+            return _mission_answer(level, "Farbcodierung nach Quantity", "text", ["hue"],
+                "Mehr Informationen in einem Plot",
+                "Nutze die Bestellmenge als zusätzliche visuelle Dimension. Erstelle einen Scatterplot von Einkaufsbetrag gegen Kosten und kodiere die Punkte nach `Quantity`.",
+                "Seaborn kann eine weitere Variable über `hue` darstellen.")
+        return _mission_answer(level, "Scatter + Trend", "text", ["lmplot", "regplot"],
+            "Zusammenhang zwischen zwei Kennzahlen",
+            "Die Finance-Abteilung will den Zusammenhang zwischen `PurchAmount` und `Cost` untersuchen. Erstelle einen geeigneten bivariaten Plot.",
+            "Seaborn hat dafür direkt geeignete Funktionen.")
+    if 'jointplot' in c:
+        return _mission_answer(level, "Jointplot", "text", ["jointplot"],
+            "Zwei Variablen plus Verteilungen",
+            "Untersuche `PurchAmount` und `Cost` gemeinsam und zeige zusätzlich die Randverteilungen der beiden Variablen.",
+            "Gesucht ist ein Plottyp, der Scatterplot und marginale Verteilungen verbindet.")
+    if 'boxplot' in c:
+        return _mission_answer(level, "Boxplot", "text", ["boxplot"],
+            "Ausreißer in Kundendaten",
+            "Visualisiere die Verteilung einer numerischen Kennzahl in einem Boxplot, damit Median, Streuung und mögliche Ausreißer sichtbar werden.",
+            "Boxplots eignen sich besonders gut für Verteilungen und Ausreißer.")
+    if 'barplot' in c:
+        return _mission_answer(level, "Balkendiagramm", "text", ["barplot"],
+            "Kategorien vergleichen",
+            "Das Management will Kategorien nebeneinander vergleichen. Erstelle einen Balkenplot für eine kategorische Zusammenfassung.",
+            "Ein Barplot ist passend für den direkten Vergleich von Kategorien.")
+    if 'stripplot' in c:
+        return _mission_answer(level, "Stripplot", "text", ["stripplot"],
+            "Einzelne Beobachtungen sichtbar machen",
+            "Zeige die einzelnen Beobachtungen einer Verteilung als Punkte, damit nicht nur eine Zusammenfassung, sondern auch die Streuung sichtbar wird.",
+            "Seaborn bietet dafür einen speziellen Punkt-/Strip-Plot.")
+    if 'pointplot' in c:
+        return _mission_answer(level, "Pointplot", "text", ["pointplot"],
+            "Gruppenmittelwerte vergleichen",
+            "Stelle eine Kennzahl als Punkte über mehrere Gruppen dar, sodass Gruppenunterschiede leicht verglichen werden können.",
+            "Ein Pointplot ist für gruppierte Zusammenfassungen geeignet.")
+    if 'scatter_kws' in c:
+        return _mission_answer(level, "Punkte größer darstellen", "text", ["scatter_kws"],
+            "Die Grafik ist zu klein",
+            "Der Plot soll in einer Präsentation besser lesbar sein. Erstelle deinen Scatterplot und vergrößere die Datenpunkte gezielt über `scatter_kws`.",
+            "Seaborn akzeptiert zusätzliche Einstellungen für die Punktdarstellung.")
+    if 'colorbar(points)' in c:
+        return _mission_answer(level, "Farbskala", "text", ["colorbar"],
+            "Eine dritte Dimension erklären",
+            "Du hast die Farbe eines Scatterplots an eine numerische Variable gekoppelt. Ergänze eine Farbskala, damit der Leser weiß, was die Farben bedeuten.",
+            "Matplotlib kann zu einem Scatter-Objekt eine Colorbar hinzufügen.")
+    if 'cmap=' in c:
+        return _mission_answer(level, "Farbkodierter Scatterplot", "text", ["scatter", "cmap"],
+            "Kosten als zusätzliche visuelle Information",
+            "Erstelle einen Scatterplot von Einkaufsbetrag und Kosten und verwende die Kosten zusätzlich als Farbintensität.",
+            "Bei `scatter()` kann die Farbe der Punkte aus einer dritten Variable kommen.")
+    if 'set_palette' in c:
+        return _mission_answer(level, "Accent", "text", ["set_palette"],
+            "Ein Corporate-Reporting-Thema",
+            "Für eine Berichtsrunde soll Seaborn die Standardpalette `Accent` verwenden. Setze diese Palette global für die folgenden Grafiken.",
+            "Seaborn kann eine Standardpalette für nachfolgende Plots setzen.")
+    if 'set_style("darkgrid"' in c and 'grid.color' not in c:
+        return _mission_answer(level, "darkgrid", "text", ["set_style"],
+            "Ein Plot braucht ein lesbares Raster",
+            "Stelle den Seaborn-Plotstil auf `darkgrid`, damit das Ablesen der Werte im Reporting leichter fällt.",
+            "Es gibt eine globale Seaborn-Funktion für den Plotstil.")
+    if 'axes_style()' in c:
+        return _mission_answer(level, "Style-Konfiguration", "text", ["axes_style"],
+            "Welcher Stil ist aktuell aktiv?",
+            "Bevor du einen Team-Standard änderst, gib die aktuelle Achsen-/Style-Konfiguration von Seaborn aus.",
+            "Die Funktion liefert ein Dictionary-artiges Konfigurationsobjekt.")
+    if 'grid.color' in c:
+        return _mission_answer(level, "Benutzerdefinierter Plotstil", "text", ["set_style", "grid.color"],
+            "Ein Bericht mit eigenem Raster",
+            "Verfeinere den Plotstil: Verwende `darkgrid` und passe mindestens die Rasterfarbe oder die Linienart explizit an.",
+            "`set_style()` kann neben dem Stilnamen auch ein Dictionary mit Einstellungen bekommen.")
+    if c.startswith('fig, ax = plt.subplots()'):
+        return _mission_answer(level, "Figure + Axes", "text", ["subplots"],
+            "Sauberer Einstieg in komplexe Grafiken",
+            "Baue einen Figure-/Axes-Kontext auf, damit mehrere Plot-Elemente später gezielt auf derselben Achse platziert werden können.",
+            "`plt.subplots()` liefert typischerweise Figure und Axes zurück.")
+    if 'FacetGrid' in c and 'hue="Quantity"' in c:
+        return _mission_answer(level, "Jahr + Quantity", "text", ["FacetGrid", "hue"],
+            "Vier Dimensionen in einer Grafik",
+            "Teile den Report nach `Year` in mehrere Panels auf und kodiere zusätzlich die Bestellmenge über die Farbe.",
+            "FacetGrid kann über Spalten filtern und zusätzlich eine Hue-Variable verwenden.")
+    if 'FacetGrid' in c:
+        return _mission_answer(level, "Panels nach Jahr", "text", ["FacetGrid"],
+            "Jedes Jahr bekommt sein eigenes Panel",
+            "Das Management möchte Einkaufsbetrag gegen Kosten für jedes Jahr getrennt sehen. Erstelle dafür einen FacetGrid mit maximal drei Panels pro Zeile.",
+            "FacetGrid zerlegt einen Datensatz automatisch in mehrere Teilgrafiken.")
+    if 'suptitle' in c:
+        return _mission_answer(level, "Gemeinsamer Haupttitel", "text", ["suptitle"],
+            "Mehrere Grafiken, ein Thema",
+            "Verleihe einer Figure mit mehreren Teilgrafiken einen gemeinsamen Haupttitel.",
+            "Der Figure-Titel sitzt über den einzelnen Axes.")
+
+    # 102–140: Merging, Missing Values, SQL
+    if 'how="inner"' in c and 'left_on' not in c:
+        return _mission_answer(level, "Inner Join", "text", ["merge", "inner"],
+            "Nur passende Kunden behalten",
+            "Du hast zwei Tabellen mit derselben ID. Verbinde sie so, dass nur Datensätze erhalten bleiben, die in beiden Tabellen einen passenden Schlüssel besitzen.",
+            "Das beschreibt einen Inner Join.")
+    if 'how="outer"' in c:
+        return _mission_answer(level, "Full Outer Join", "text", ["merge", "outer"],
+            "Nichts aus zwei Systemen verlieren",
+            "Zwei Quellsysteme sollen vollständig zusammengeführt werden. Behalte auch Schlüssel, die nur in einer der beiden Tabellen vorkommen.",
+            "Gesucht ist ein Join, der beide Tabellen vollständig berücksichtigt.")
+    if 'how="left"' in c and 'left_on' not in c:
+        return _mission_answer(level, "Left Join", "text", ["merge", "left"],
+            "Die linke Tabelle ist führend",
+            "Behalte alle Datensätze der linken Tabelle und ergänze nur passende Informationen aus der rechten Tabelle.",
+            "Der Join-Typ steckt im `how`-Parameter.")
+    if 'how="right"' in c and 'left_on' not in c:
+        return _mission_answer(level, "Right Join", "text", ["merge", "right"],
+            "Die rechte Tabelle ist führend",
+            "Diesmal soll die rechte Tabelle vollständig erhalten bleiben. Ergänze die Treffer aus der linken Tabelle.",
+            "Das Gegenstück zum Left Join heißt Right Join.")
+    if 'left_on="ID", right_on="CustID"' in c:
+        return _mission_answer(level, "Join mit unterschiedlichen Schlüsselnamen", "text", ["left_on", "right_on"],
+            "Zwei Systeme nennen denselben Schlüssel unterschiedlich",
+            "In Tabelle A heißt der Schlüssel `ID`, in Tabelle B `CustID`. Verbinde die Tabellen trotzdem korrekt.",
+            "Wenn die Schlüsselnamen unterschiedlich sind, brauchst du `left_on` und `right_on`.")
+    if 'on=["ID", "TransDate"]' in c:
+        return _mission_answer(level, "2-Schlüssel-Join", "text", ["merge", "on=["],
+            "Ein Match braucht ID und Datum",
+            "Ein Datensatz gilt nur dann als Treffer, wenn sowohl `ID` als auch `TransDate` übereinstimmen. Führe diesen Mehrfachschlüssel-Merge durch.",
+            "Mehrere Join-Schlüssel können gemeinsam übergeben werden.")
+    if 'left_on=["Customer","TransDate"]' in c:
+        return _mission_answer(level, "Customer + Datum Join", "text", ["left_on", "right_on"],
+            "Kunden und Stammdaten über zwei Merkmale verknüpfen",
+            "Verbinde die Transaktionen mit den Kundendaten über `Customer` und über das jeweilige Datum; die rechte Tabelle nennt das Datumsfeld `JoinDate`.",
+            "Du kannst über mehrere Schlüssel joinen, auch wenn die Spaltennamen nicht identisch sind.")
+    if c.startswith('pd.merge(myData, CustData'):
+        return _mission_answer(level, "Pandas-Style Merge", "text", ["pd.merge"],
+            "Alternative Schreibweise",
+            "Verbinde Transaktions- und Kundendaten mit der funktionalen `pd.merge(...)`-Schreibweise. Prüfe anschließend, wie viele Zeilen daraus entstehen.",
+            "Pandas bietet für Merges sowohl eine DataFrame- als auch eine Funktionsschreibweise.")
+    if c.startswith("myData.dropna"):
+        return _mission_answer(level, "Fehlwerte entfernt", "text", ["dropna"],
+            "Ein sauberer Arbeitsstand",
+            "Für einen Export dürfen keine unvollständigen Zeilen mehr enthalten sein. Entferne Zeilen mit mindestens einem fehlenden Wert.",
+            "`dropna()` entfernt standardmäßig Zeilen mit fehlenden Werten.")
+    if 'pd.isnull(myData["PurchAmount"])' in c and '~' not in c:
+        return _mission_answer(level, "Fehlende PurchAmount-Werte", "text", ["isnull"],
+            "Wo fehlt der Einkaufsbetrag?",
+            "Suche gezielt alle Transaktionen, bei denen `PurchAmount` fehlt. Gib nur diese Fälle aus.",
+            "`pd.isnull()` erzeugt eine boolesche Maske für fehlende Werte.")
+    if '== None' in c:
+        return _mission_answer(level, "Keine zuverlässige Missing-Value-Prüfung", "text", ["None"],
+            "Ein falscher Ansatz im Audit",
+            "Der Qualitätsmanager zeigt dir einen bestehenden Code: `myData[\"PurchAmount\"] == None`. Prüfe ihn praktisch und entscheide, ob er für NaN-Werte zuverlässig ist. Antworte mit `nein`.",
+            "NaN ist nicht dasselbe wie Python-None. Teste den Ausdruck, statt ihn einfach zu übernehmen.")
+    if '~pd.isnull' in c or '~ pd.isnull' in c:
+        return _mission_answer(level, "Nicht fehlende Werte", "text", ["isnull", "~"],
+            "Nur vollständige Beträge behalten",
+            "Zeige alle Transaktionen, in denen `PurchAmount` tatsächlich vorhanden ist.",
+            "Invertiere die Missing-Value-Maske mit dem Negationsoperator.")
+    if 'np.mean([1, 2, np.nan, 3])' in c:
+        return _mission_answer(level, "nan", "text", ["np.mean"],
+            "Ein fehlender Wert verdirbt den Mittelwert",
+            "Berechne den Mittelwert der Liste `[1, 2, np.nan, 3]` mit normalem NumPy-Mittelwert und beobachte das Ergebnis.",
+            "Der normale NumPy-Mittelwert behandelt NaN nicht wie einen normalen Zahlenwert.")
+    if 'np.nanmean' in c:
+        return _mission_answer(level, "2", "number", ["nanmean"],
+            "Mittelwert trotz fehlendem Wert",
+            "Berechne den Mittelwert der Liste `[1, 2, np.nan, 3]`, wobei der fehlende Wert ignoriert werden soll.",
+            "NumPy besitzt eine spezielle Funktion für Mittelwerte, die NaN ignorieren.")
+    if 'groupby("Customer")["PurchAmount"].mean()' in c:
+        return _mission_answer(level, "Kundenmittelwerte", "text", ["groupby", "mean"],
+            "Durchschnittlicher Einkauf je Kunde",
+            "Berechne für jeden Kunden den durchschnittlichen `PurchAmount`. Fehlende Werte sollen dabei nicht die gesamte Gruppe zerstören.",
+            "Pandas-Groupby kann direkt mit `mean()` arbeiten.")
+    if 'transactions.groupby("Customer").agg(AggPurch' in c and 'AggQuant' not in c:
+        return _mission_answer(level, "AggPurch", "text", ["groupby", "agg"],
+            "Kundensumme für CRM",
+            "Erzeuge eine Tabelle mit einer Zeile pro Kunde und einer Kennzahl `AggPurch`, die die Summe des Einkaufsbetrags enthält.",
+            "Nutze `groupby()` plus eine benannte Aggregation.")
+    if 'transactions.groupby("Customer").agg(AggPurch=("PurchAmount", "sum"),\nAggQuant' in c or 'AggQuant' in c:
+        return _mission_answer(level, "AggPurch + AggQuant", "text", ["groupby", "agg"],
+            "Kundenreport mit zwei Kennzahlen",
+            "Erstelle pro Kunde gleichzeitig die Summe des Einkaufsbetrags und die Summe der gekauften Menge.",
+            "Mehrere Aggregationen lassen sich in einem `agg()`-Aufruf bündeln.")
+    if 'transactions.groupby(transactions["TransDate"].dt.to_period("M"))' in c:
+        return _mission_answer(level, "Monatlicher AggPurch", "text", ["to_period", "groupby"],
+            "Monatlicher Einkaufsreport in SQL-Nähe",
+            "Erzeuge eine monatliche Summenübersicht der `PurchAmount`-Werte auf Basis des Transaktionsdatums.",
+            "Der PDF-Code zeigt, wie eine Datumsperiode als Gruppenschlüssel verwendet werden kann.")
+    if c.strip() == 'import sqlite3':
+        return _mission_answer(level, "sqlite3 importiert", "text", ["sqlite3"],
+            "Das SQL-Labor wird geöffnet",
+            "Der interne Data-Lab-Server ist heute nicht verfügbar. Öffne deshalb die lokale SQLite-Schnittstelle in Python und bereite den weiteren Datenbankzugriff vor.",
+            "SQLite ist eine lokale Datenbank und braucht keinen separaten Server.")
+    if 'sqlite_master' in c:
+        return _mission_answer(level, "Tabellenliste", "text", ["sqlite_master", "execute"],
+            "Welche Tabellen gibt es?",
+            "Im lokalen SQL-Labor möchtest du zuerst wissen, welche Tabellen überhaupt vorhanden sind. Frage die SQLite-Systemtabelle `sqlite_master` ab.",
+            "SQLite speichert Metadaten über Tabellen in `sqlite_master`.")
+    if c.startswith('cursor.fetchall'):
+        return _mission_answer(level, "Alle Abfragezeilen", "text", ["fetchall"],
+            "Das Ergebnis vollständig abholen",
+            "Nach einer SQL-Abfrage soll dein Python-Programm alle vom Cursor gelieferten Zeilen übernehmen. Verwende dafür die passende Cursor-Methode.",
+            "Ein Cursor kann das Abfrageergebnis vollständig abrufen.")
+    if 'pd.read_sql_query' in c:
+        return _mission_answer(level, "transactions", "text", ["read_sql_query"],
+            "SQL direkt in einen DataFrame laden",
+            "Hole die komplette `transactions`-Tabelle per SQL ab und überführe das Ergebnis direkt in einen pandas DataFrame.",
+            "Pandas kann SQL-Abfragen unmittelbar als DataFrame einlesen.")
+    if 'to_sql(con=con' in c:
+        return _mission_answer(level, "new_table", "text", ["to_sql"],
+            "Python-Daten in SQL zurückschreiben",
+            "Du hast in Python einen DataFrame erzeugt und möchtest ihn als Tabelle `new_table` in der lokalen SQLite-Datenbank speichern.",
+            "Pandas besitzt eine Methode, die DataFrames in SQL-Tabellen schreibt.")
+    if 'DROP TABLE new_table' in c:
+        return _mission_answer(level, "Tabelle gelöscht", "text", ["DROP TABLE"],
+            "Eine temporäre SQL-Tabelle entfernen",
+            "Nach dem Export wird die Testtabelle `new_table` nicht mehr benötigt. Entferne sie per SQL aus dem lokalen Data Lab.",
+            "`DROP TABLE` entfernt eine Tabelle aus der Datenbank.")
+    if c.strip() == 'con.commit()':
+        return _mission_answer(level, "Änderung gespeichert", "text", ["commit"],
+            "Die Datenbankänderung muss dauerhaft werden",
+            "Du hast eine Änderung an der lokalen SQLite-Datenbank vorgenommen. Schreibe die Transaktion dauerhaft in die Datenbank.",
+            "Datenbankänderungen werden erst durch einen Commit festgeschrieben.")
+    if c.strip() == 'con.close()':
+        return _mission_answer(level, "Verbindung geschlossen", "text", ["close"],
+            "Das SQL-Labor sauber verlassen",
+            "Dein Script ist fertig und soll die Datenbankverbindung ordentlich schließen. Beende die offene Verbindung.",
+            "Eine geöffnete Datenbankverbindung sollte am Ende geschlossen werden.")
+    if c.startswith('SELECT * FROM transactions WHERE PurchAmount > 100'):
+        return _mission_answer(level, "SQL-Filter", "text", ["SELECT", "WHERE", "PurchAmount"],
+            "SQL statt pandas: große Käufe finden",
+            "Formuliere im SQL-Labor eine Abfrage, die nur Transaktionen mit `PurchAmount > 100` liefert.",
+            "SQL filtert mit `WHERE`.")
+    if c.startswith('SELECT Customer, TransDate, PurchAmount FROM transactions'):
+        return _mission_answer(level, "3 Spalten per SQL", "text", ["SELECT", "Customer", "TransDate"],
+            "Nur drei Spalten aus SQL zurückgeben",
+            "Formuliere eine SQL-Abfrage, die nur `Customer`, `TransDate` und `PurchAmount` aus `transactions` zurückliefert.",
+            "Bei SQL bestimmst du die Spalten direkt nach `SELECT`.")
+    if c.startswith('SELECT TransDate, Cost FROM transactions WHERE PurchAmount > 100'):
+        return _mission_answer(level, "SQL-Filter + Spaltenwahl", "text", ["SELECT", "WHERE"],
+            "SQL-Export für die Finance-Abteilung",
+            "Liefere per SQL nur `TransDate` und `Cost` für Transaktionen mit `PurchAmount > 100`.",
+            "Kombiniere Spaltenauswahl und `WHERE` in einer Abfrage.")
+    if c.startswith('INSERT INTO transactions'):
+        return _mission_answer(level, "1 neue Transaktion", "text", ["INSERT INTO"],
+            "Eine Nachmeldung ins System schreiben",
+            "Ein verspätet gemeldeter Kauf muss im lokalen SQL-Labor als neue Zeile ergänzt werden. Füge den im Auftrag genannten Datensatz mit `INSERT INTO` ein.",
+            "Mit `INSERT INTO ... VALUES ...` werden neue Datensätze geschrieben.")
+    if c.startswith('ALTER TABLE transactions ADD NewCol'):
+        return _mission_answer(level, "NewCol", "text", ["ALTER TABLE"],
+            "Die Datenstruktur wird erweitert",
+            "Das interne Reporting bekommt eine zusätzliche Spalte `NewCol`. Erweitere die bestehende SQL-Tabelle um diese neue Spalte.",
+            "`ALTER TABLE` verändert die Struktur einer bestehenden Tabelle.")
+    if c.startswith('SELECT Customer, SUM(PurchAmount) AS AggPurch'):
+        return _mission_answer(level, "AggPurch", "text", ["GROUP BY", "SUM"],
+            "Kundensummen direkt in SQL",
+            "Erzeuge einen SQL-Report mit einer Zeile pro Customer und einer Spalte `AggPurch`, die den gesamten Einkaufsbetrag summiert.",
+            "SQL aggregiert mit `SUM(...)` und gruppiert mit `GROUP BY`.")
+    if c.startswith("SELECT DATE(TransDate, 'start of month')"):
+        return _mission_answer(level, "Monatsanfang", "text", ["DATE", "start of month"],
+            "SQL-Monatsreport",
+            "Transformiere das Transaktionsdatum im SQL-Labor auf den Monatsanfang, damit Monatsgruppen gebildet werden können.",
+            "SQLite besitzt Datumsfunktionen, mit denen ein Monatsanfang erzeugt werden kann.")
+    if c.startswith('SELECT * FROM A INNER JOIN B'):
+        return _mission_answer(level, "INNER JOIN", "text", ["INNER JOIN", "ON"],
+            "Zwei Tabellen: nur echte Treffer",
+            "Verbinde `A` und `B` über `ID` und behalte nur IDs, die in beiden Tabellen vorkommen.",
+            "Das entspricht dem pandas-Inner-Join.")
+    if c.startswith('SELECT * FROM A LEFT JOIN B'):
+        return _mission_answer(level, "LEFT JOIN", "text", ["LEFT JOIN", "ON"],
+            "Die linke Tabelle ist vollständig",
+            "Verbinde `A` und `B`, wobei alle Zeilen aus `A` erhalten bleiben sollen.",
+            "SQL verwendet dafür `LEFT JOIN`.")
+    if 'A.TransDate = B.TransDate' in c:
+        return _mission_answer(level, "Join über ID + Datum", "text", ["INNER JOIN", "AND", "TransDate"],
+            "Ein Treffer braucht zwei Schlüssel",
+            "Ein Datensatz gilt nur dann als Match, wenn sowohl `ID` als auch `TransDate` übereinstimmen. Formuliere den SQL-Join entsprechend.",
+            "Mehrere Join-Bedingungen werden mit `AND` verknüpft.")
+    if 'FULL OUTER JOIN' in c:
+        return _mission_answer(level, "FULL OUTER JOIN", "text", ["FULL OUTER JOIN"],
+            "Keine Zeile verlieren",
+            "Ein Audit verlangt alle Zeilen aus `X` und `Y`, auch wenn kein Gegenstück existiert. Nutze einen Full-Outer-Join-Ansatz.",
+            "Hinweis: SQLite unterstützt `FULL OUTER JOIN` nicht nativ – unser Labor simuliert bzw. demonstriert den Unterschied.")
+    if 'RIGHT JOIN' in c:
+        return _mission_answer(level, "RIGHT JOIN", "text", ["RIGHT JOIN"],
+            "Die rechte Tabelle ist vollständig",
+            "Zeige einen SQL-Ansatz, bei dem alle Zeilen aus `Y` erhalten bleiben und Treffer aus `X` ergänzt werden. Beachte dabei die Besonderheiten von SQLite.",
+            "SQLite unterstützt Right Join je nach Version nicht wie klassische Server. Unser lokales Labor dient hier als Lernsimulation.")
+    if 'UNION ALL' in c and 'LEFT JOIN' in c:
+        return _mission_answer(level, "SQLite Full-Outer-Join-Workaround", "text", ["UNION ALL", "LEFT JOIN"],
+            "Full Outer Join ohne Server",
+            "Das lokale SQLite-Labor hat keinen nativen Full-Outer-Join. Baue den im Skript gezeigten Workaround aus zwei Left Joins und `UNION ALL` nach.",
+            "Der Trick ist: beide Richtungen verbinden und bereits gefundene Matches aus dem zweiten Teil ausschließen.")
+
+    # 141–155: if / loops / functions
+    if c.startswith('x = -3') and 'if x < 0:' in c:
+        return _mission_answer(level, "x is a negative number", "text", ["if", "< 0"],
+            "Eine Warnampel für negative Werte",
+            "Ein Qualitätscheck erhält den Wert `x = -3`. Gib `x is a negative number` aus, wenn der Wert negativ ist.",
+            "Eine einfache `if`-Bedingung reicht.")
+    if c.startswith('if x < 0:') and 'elif' not in c and 'else:' in c:
+        return _mission_answer(level, "x is either a positive number or zero", "text", ["if", "else"],
+            "Negativ oder nicht negativ?",
+            "Baue eine Entscheidung für einen Kennzahlencheck: Gib bei negativen Werten eine Warnung aus, sonst die Meldung `x is either a positive number or zero`.",
+            "`else` deckt alle Fälle ab, die die `if`-Bedingung nicht erfüllen.")
+    if 'elif x == 0' in c:
+        return _mission_answer(level, "x is zero", "text", ["if", "elif", "else"],
+            "Drei Zustände unterscheiden",
+            "Ein Kontrollscript soll einen Wert in drei Fälle einteilen: negativ, genau null oder positiv. Teste den Nullfall und gib `x is zero` aus.",
+            "Hier brauchst du `if`, `elif` und `else`.")
+    if c.startswith('x = 1\nwhile x <= 7'):
+        return _mission_answer(level, "7", "number", ["while"],
+            "Bis sieben zählen",
+            "Ein Monitor soll die Werte 1 bis 7 nacheinander ausgeben. Verwende eine `while`-Schleife und stelle sicher, dass sie sauber endet.",
+            "Achte besonders darauf, die Schleifenvariable innerhalb der Schleife zu verändern.")
+    if c.startswith('cities = [') and 'for city in cities:' in c and 'break' not in c and 'continue' not in c:
+        return _mission_answer(level, "5", "number", ["for", "cities"],
+            "Alle Regionen durchlaufen",
+            "Du erhältst eine Liste mit fünf Städten. Gib jede Stadt in einer eigenen Zeile aus und ermittle anschließend, wie viele Einträge verarbeitet wurden.",
+            "Eine `for`-Schleife kann direkt über die Elemente einer Liste laufen.")
+    if 'if city == "London":' in c and 'break' in c:
+        return _mission_answer(level, "London", "text", ["for", "break"],
+            "Bis zur ersten London-Meldung",
+            "Durchsuche die Städteliste der Reihe nach und stoppe die Verarbeitung sofort, sobald `London` erreicht wurde.",
+            "`break` beendet die Schleife vollständig.")
+    if 'if city == "London":' in c and 'continue' in c:
+        return _mission_answer(level, "London übersprungen", "text", ["for", "continue"],
+            "London soll aus dem Export verschwinden",
+            "Gib alle Städte aus, aber überspringe `London`, ohne die gesamte Schleife abzubrechen.",
+            "`continue` überspringt nur den aktuellen Durchlauf.")
+    if 'range(len(cities))' in c:
+        return _mission_answer(level, "5", "number", ["range", "len"],
+            "Mit Positionsnummern arbeiten",
+            "Durchlaufe alle Städte über ihre numerischen Indizes und gib jeweils den Eintrag an dieser Position aus.",
+            "Hier lernst du die Kombination aus `range()` und `len()`.")
+    if 'wordLength = []' in c:
+        return _mission_answer(level, "Liste mit 5 Längen", "text", ["append", "for"],
+            "Die Länge jeder Region berechnen",
+            "Erzeuge eine leere Ergebnisliste und fülle sie in einer Schleife mit der Zeichenlänge jeder Stadt.",
+            "`append()` hängt pro Durchlauf ein neues Ergebnis an eine Liste an.")
+    if c.startswith('list(map(len, cities))'):
+        return _mission_answer(level, "[8, 5, 6, 6, 9]", "text", ["map", "len"],
+            "Die Schleife kompakter schreiben",
+            "Die Städte sind `New York`, `Paris`, `London`, `Tokyo`, `Cape Town`. Erzeuge die Liste ihrer Zeichenlängen ohne eine explizite `for`-Schleife zu schreiben.",
+            "`map()` kann eine Funktion auf alle Elemente einer Sequenz anwenden.")
+    if 'np.array' in c and 'a * 10' in c:
+        return _mission_answer(level, "Vektorisiert", "text", ["np.array"],
+            "Eine ganze Zahlenliste auf einmal rechnen",
+            "Erzeuge ein NumPy-Array und führe eine arithmetische Operation auf dem gesamten Array gleichzeitig aus, statt jeden Wert einzeln zu bearbeiten.",
+            "NumPy-Arrays erlauben vektorisierte Rechnungen.")
+    if c.startswith('def add(x, y=1):'):
+        return _mission_answer(level, "6", "number", ["def", "return"],
+            "Ein kleiner wiederverwendbarer Rechenschritt",
+            "Baue eine Funktion `add(x, y=1)`, die zwei Werte addiert. Teste sie mit `x=5` und ohne einen zweiten Parameter.",
+            "Die Funktion braucht einen Default-Wert für `y` und muss ein Ergebnis zurückgeben.")
+    if c.strip() == 'import pandas as pd' and p == 18:
+        return _mission_answer(level, "pandas importiert", "text", ["import pandas"],
+            "Das Data Lab bekommt Zugriff auf pandas",
+            "Bereite ein neues Analytics-Script vor, indem du pandas unter dem üblichen Alias importierst und anschließend eine kleine pandas-Funktion verwendest.",
+            "Das Kapitel arbeitet im weiteren Verlauf mit dem Alias `pd`.")
+    if c.startswith('def KPIs'):
+        return _mission_answer(level, "Profit und ROI", "text", ["def", "return", "roi"],
+            "Ein KPI-Paket für das Management",
+            "Schreibe eine Funktion `KPIs`, die für einen übergebenen Datensatz gleichzeitig Profit und ROI berechnet und beide Werte gemeinsam zurückgibt.",
+            "Eine Funktion darf auch mehrere Ergebnisse als Liste zurückgeben.")
+    if 'np.sqrt(np.var' in c and 'np.std' in c:
+        return _mission_answer(level, "Standardabweichung", "text", ["np.std"],
+            "Streuung einer Zahlenreihe",
+            "Berechne die Standardabweichung einer kleinen Zahlenreihe einmal direkt mit NumPy und überprüfe, dass eine direkte Funktion verfügbar ist.",
+            "`np.std()` ist die direkte Variante.")
+    if c.startswith('range(2, 13)'):
+        return _mission_answer(level, "2 bis 12", "text", ["range"],
+            "Eine Folge für einen Testlauf erzeugen",
+            "Erzeuge die Ganzzahlfolge für die Monats-IDs 2 bis 12. Die obere Grenze soll nicht enthalten sein.",
+            "Bei `range(start, stop)` ist `stop` ausgeschlossen.")
+    if c.startswith('np.arange(start=1, stop=12, step=3)'):
+        return _mission_answer(level, "1, 4, 7, 10", "text", ["arange"],
+            "Regelmäßige Messpunkte",
+            "Erzeuge mit NumPy eine Zahlenfolge von 1 bis kleiner als 12 mit einer Schrittweite von 3. Teste zusätzlich, dass `arange` auch Dezimalwerte verarbeiten kann.",
+            "`np.arange()` ist praktisch, wenn du eine frei wählbare Schrittweite brauchst.")
+    if 'ascii_lowercase' in c:
+        return _mission_answer(level, "a, b, c, d, e", "text", ["ascii_lowercase"],
+            "Buchstaben für Testschlüssel erzeugen",
+            "Erzeuge die ersten fünf Kleinbuchstaben automatisch. Du sollst sie nicht einzeln hinschreiben.",
+            "Das `string`-Modul stellt die Buchstabenfolgen bereits bereit.")
+    if c.startswith('pd.date_range'):
+        return _mission_answer(level, "3 Monatsanfänge", "text", ["date_range"],
+            "Ein Monatskalender für ein Testscript",
+            "Erzeuge die Monatsanfänge von Januar bis März 2011 als Datumsreihe.",
+            "Nutze `freq=""MS""` für Monatsanfänge.")
+    if c.startswith('np.tile'):
+        return _mission_answer(level, "36 Werte", "number", ["tile"],
+            "Ein Jahresmuster drei Mal wiederholen",
+            "Du brauchst die Monate 1 bis 12 dreimal hintereinander. Erzeuge diese Sequenz automatisch.",
+            "`tile()` wiederholt die komplette Sequenz.")
+    if c.startswith('np.repeat'):
+        return _mission_answer(level, "36 Werte", "number", ["repeat"],
+            "Jeder Monat bekommt drei Slots",
+            "Erzeuge die Monate 1 bis 12 so, dass jeder Monat drei Mal hintereinander vorkommt.",
+            "`repeat()` wiederholt jedes Element statt die gesamte Sequenz.")
+    if c.startswith('list(itertools.product'):
+        return _mission_answer(level, "6 Kombinationen", "number", ["itertools.product"],
+            "Alle möglichen Testkombinationen",
+            "Erzeuge alle Kombinationen aus den IDs 165, 166, 167 und den Statuswerten 1 und 2. Wie viele Kombinationen entstehen?",
+            "Das kartesische Produkt kombiniert jedes Element der ersten mit jedem der zweiten Liste.")
+    if c.startswith('CustData.drop_duplicates'):
+        return _mission_answer(level, "Duplikate entfernt", "text", ["drop_duplicates"],
+            "Doppelte Stammdaten bereinigen",
+            "Vor dem Merge sollen doppelte Kundenzeilen aus `CustData` entfernt werden. Bereite einen deduplizierten DataFrame vor und prüfe die Anzahl der eindeutigen Zeilen.",
+            "`drop_duplicates()` entfernt doppelte Zeilen.")
+    if c.startswith('import names'):
+        return _mission_answer(level, "Name erzeugt", "text", ["names", "get_"],
+            "Testdaten mit realistisch wirkenden Namen",
+            "Ein Demo-System braucht einen zufälligen Vor-, Nach- und vollständigen Namen für Testdaten. Erzeuge mindestens einen davon mit einer passenden Namensfunktion.",
+            "Das Skript zeigt dafür das Paket `names`; unser Spiel stellt dafür eine lokale Ersatzfunktion bereit.")
+    if c.startswith('ids ='):
+        return _mission_answer(level, "0001, 0010", "text", ["zfill"],
+            "Kundencodes standardisieren",
+            "Die IDs `[1, 10]` sollen als vierstellige Strings ausgegeben werden. Ergänze führende Nullen.",
+            "`zfill(4)` erweitert einen String auf vier Stellen.")
+    if c.startswith("friends = ['Nicholas'"):
+        return _mission_answer(level, "True, False, False", "text", ["in", "for"],
+            "Bestimmten Namen finden",
+            "Prüfe für die Liste `['Nicholas', 'Thomas', 'Kayla']`, ob jeder Eintrag die Zeichenkette `Nicholas` enthält.",
+            "Eine List Comprehension kann für jeden Eintrag eine True/False-Prüfung erzeugen.")
+    if c.startswith('firstname.split'):
+        return _mission_answer(level, "Vorname + Rest", "text", ["split"],
+            "Einen vollständigen Namen zerlegen",
+            "Ein vollständiger Name soll beim ersten Leerzeichen in maximal zwei Teile zerlegt werden. Verwende einen passenden String-Ansatz.",
+            "`split(separator, maxsplit)` kann die maximale Anzahl der Trennungen begrenzen.")
+    if c.startswith('list(map(hash'):
+        return _mission_answer(level, "Hash-Liste", "text", ["hash", "map"],
+            "IDs für einen Testdatensatz pseudonymisieren",
+            "Erzeuge für alle Kunden-IDs eine Liste numerischer Hashwerte, sodass die ursprünglichen IDs nicht direkt ausgegeben werden.",
+            "Der im PDF gezeigte Ansatz nutzt `hash` als Funktion innerhalb von `map`.")
+    if 'Store_Cust' in c and 'astype(str)' in c:
+        return _mission_answer(level, "Store_Cust", "text", ["astype", "Store_Cust"],
+            "Eine zusammengesetzte Schlüsselspalte",
+            "Erzeuge eine neue Spalte `Store_Cust`, die Store und CustId mit einem Unterstrich verbindet. Achte darauf, dass beide Bestandteile Strings werden.",
+            "Mit `.astype(str)` lassen sich Spalten vor dem Zusammenfügen in Strings umwandeln.")
+    if c.startswith('np.random.choice'):
+        return _mission_answer(level, "5 Werte", "number", ["random.choice"],
+            "Eine Stichprobe aus diskreten Werten",
+            "Für einen Testlauf werden zufällig fünf Werte aus 0 bis 9 gezogen. Ziehe sie ohne Zurücklegen.",
+            "`replace=False` bedeutet: Ein Wert darf in der Stichprobe nicht mehrfach vorkommen.")
+    if c.startswith('np.random.normal'):
+        return _mission_answer(level, "500", "number", ["random.normal"],
+            "Simulierte Messwerte",
+            "Ein Sensor-Simulator soll 500 Messwerte mit Mittelwert 5 und Standardabweichung 1 erzeugen. Erzeuge die Stichprobe.",
+            "Bei einer Normalverteilung stehen `loc` und `scale` für Mittelwert und Standardabweichung.")
+    if c.startswith('np.random.seed'):
+        return _mission_answer(level, "wiederholbar", "text", ["random.seed", "normal"],
+            "Der Zufall muss reproduzierbar werden",
+            "Für einen Unit-Test sollen fünf Zufallswerte nach jedem Start identisch sein. Setze einen festen Seed und generiere anschließend die fünf Werte.",
+            "Ein fester Seed sorgt dafür, dass dieselbe Zufallssequenz reproduzierbar wird.")
+
+    if 'groupby("Customer").agg(new_col=("PurchAmount", "sum"))' in c:
+        return _mission_answer(level, "AggPurch", "text", ["groupby", "agg", "sum"],
+            "Kundensummen als neuer Report",
+            "Der CRM-Export soll je Kunde genau eine Zeile enthalten und eine neue Spalte `new_col` mit der gesamten Kaufsumme ausweisen.",
+            "Gruppiere nach Kunde, aggregiere `PurchAmount` mit `sum()` und setze den Index zurück.")
+    if 'groupby("Customer").agg(AggPurch=("PurchAmount", "sum")' in c and 'AggQuant' not in c and 'MaxPurch' not in c and 'lambda' not in c and "Chaining" not in original_title:
+        return _mission_answer(level, "AggPurch", "text", ["groupby", "agg", "sum"],
+            "Kundensummen mit einem sprechenden Namen",
+            "Erstelle den CRM-Report erneut, aber nenne die Summenspalte ausdrücklich `AggPurch`.",
+            "Benannte Aggregationen erlauben einen eigenen Namen für das Ergebnis.")
+    if 'groupby("Customer").agg(AggPurch=("PurchAmount", "sum"))' in c and 'lambda' in c:
+        return _mission_answer(level, "Kunden über 100", "text", ["groupby", "lambda"],
+            "Ein kompakter Filter nach Aggregation",
+            "Ermittle zuerst die Kaufsumme je Kunde und filtere danach direkt in derselben Kette auf Kunden mit mehr als 100 Umsatz.",
+            "Das Lernziel ist Method Chaining plus Lambda-Filter.")
+    if 'for city in cities:' in c and "break" in original_title:
+        return _mission_answer(level, "London", "text", ["for", "break"],
+            "Stoppe beim gesuchten Eintrag",
+            "Gehe die Liste der Städte durch und brich den Durchlauf sofort ab, sobald `London` erreicht wurde.",
+            "`break` verlässt die Schleife vollständig.")
+    if 'for city in cities:' in c and "continue" in original_title:
+        return _mission_answer(level, "London übersprungen", "text", ["for", "continue"],
+            "Einen Eintrag überspringen",
+            "Verarbeite alle Städte außer `London`. Der restliche Durchlauf soll weitergehen.",
+            "`continue` überspringt nur den aktuellen Durchlauf.")
+    if 'np.array([1-3])' in c:
+        return _mission_answer(level, "NumPy-Array", "text", ["np.array"],
+            "Vektorisierte Berechnung vorbereiten",
+            "Erzeuge ein NumPy-Array aus einer kleinen Zahlenfolge und führe anschließend eine arithmetische Operation auf dem gesamten Array aus.",
+            "NumPy-Arrays sind die Grundlage für vektorisierte Rechnungen.")
+    if c.strip() == 'myData.groupby("Customer").agg(AggPurch=("PurchAmount",' and "Chaining" not in original_title:
+        return _mission_answer(level, "AggPurch", "text", ["groupby", "agg"],
+            "Kundensumme mit sprechendem Ergebnisnamen",
+            "Erstelle für jeden Customer eine aggregierte Tabelle mit einer Spalte `AggPurch`, die den gesamten Einkaufsbetrag je Kunde enthält.",
+            "Gruppiere nach `Customer` und benenne die Summe der `PurchAmount`-Spalte als `AggPurch`.")
+    if c.strip() == 'myData.groupby("Customer").agg(AggPurch=("PurchAmount",' and "Chaining" in original_title:
+        return _mission_answer(level, "Kunden über 100", "text", ["groupby", "agg", "loc"],
+            "Aggregation und Filter verbinden",
+            "Erstelle zuerst die Kaufsumme je Kunde und filtere anschließend das Aggregationsergebnis auf Kunden mit einem `AggPurch` über 100.",
+            "Das Lernziel ist die Reihenfolge: aggregieren, zurück in einen DataFrame, danach filtern.")
+    # Fallback – auch unbekannte Beispiele bekommen eine echte Situation.
+    return _mission_answer(level, "Aufgabe ausgeführt", "text", [],
+        f"Praxisauftrag {i+1:03d}",
+        f"{ctx}: Setze das in diesem Abschnitt des Kurses gelernte Konzept in einer kleinen praktischen Analyse ein. Untersuche die Daten zunächst selbst und führe danach eine passende Operation durch. Verwende anschließend das Antwortfeld, um dein Ergebnis zu dokumentieren.",
+        "Nutze die Daten, experimentiere im Editor und arbeite dich Schritt für Schritt vor.")
+
+
+for _i, _level in enumerate(LEVELS):
+    build_story_mission(_level, _i)
+
+# Sicherheits-/Qualitätscheck für die finale Lernspielversion.
+assert len(LEVELS) == 172, f"Erwartet 172 PDF-basierte Level, gefunden: {len(LEVELS)}"
+assert all(l.get("task") for l in LEVELS), "Mindestens ein Level hat keine Aufgabenstellung."
+assert all("Setze das im PDF gezeigte" not in l.get("task", "") for l in LEVELS), "Ein generischer PDF-Abschreib-Auftrag ist noch vorhanden."
+assert all(not l.get("title", "").startswith("Code-Beispiel:") for l in LEVELS), "Ein Leveltitel verrät noch direkt den PDF-Code."
+
 def find_workbook():
     candidates = [
         Path("data") / "orders.xlsx",
@@ -1396,7 +2329,7 @@ class DataFlowGame(tk.Tk):
         self.editor=tk.Text(ef,wrap="none",undo=True,font=("Consolas",11)); self.editor.pack(fill="both",expand=True)
         br=ttk.Frame(center); br.pack(fill="x",pady=8)
         ttk.Button(br,text="▶ CODE AUSFÜHREN",style="Action.TButton",command=self.run_player).pack(side="left")
-        ttk.Button(br,text="PDF-CODE",command=self.show_pdf).pack(side="left",padx=6)
+        ttk.Button(br,text="DOKUMENTATION",command=self.show_pdf).pack(side="left",padx=6)
         ttk.Button(br,text="HINWEIS",command=self.show_hint).pack(side="left")
         ttk.Button(br,text="◀ VORHERIGES",command=lambda:self.load_level(self.current-1)).pack(side="right")
         ttk.Button(br,text="NÄCHSTES ▶",command=lambda:self.load_level(self.current+1)).pack(side="right",padx=6)
@@ -1426,7 +2359,7 @@ class DataFlowGame(tk.Tk):
         self.source_label.config(text=f"Quelle: Codes_python_data_analytics.pdf · Seite {lv.get('page','?')}")
         self.task.configure(state="normal"); self.task.delete("1.0",tk.END); self.task.insert("1.0",lv["task"]); self.task.configure(state="disabled")
         self.editor.delete("1.0",tk.END)
-        self.editor.insert("1.0","# Schreibe hier deine eigene Lösung.\n# Du darfst zuerst frei untersuchen: df.head(), df.info(), df.dtypes, df.columns ...\n# PDF-CODE zeigt das Originalbeispiel; es ist nicht deine einzige mögliche Lösung.\n\n")
+        self.editor.insert("1.0","# Schreibe hier deine eigene Lösung.\n# Du darfst zuerst frei untersuchen: df.head(), df.info(), df.dtypes, df.columns ...\n# Das Originalbeispiel ist nur über DOKUMENTATION als Lernhilfe erreichbar.\n\n")
         self.output.delete("1.0",tk.END); self.output.insert("1.0","Noch kein Code ausgeführt.\n")
         self.answer.delete(0,tk.END); self.last_run=None; self.refresh_level_list()
         self.status.config(text="Level geladen – freie Lösungswege sind erlaubt.")
@@ -1450,56 +2383,65 @@ class DataFlowGame(tk.Tk):
             self.status.config(text="Code fehlgeschlagen – Fehler analysieren und erneut versuchen.")
     def show_pdf(self):
         lv=LEVELS[self.current]
-        w=tk.Toplevel(self); w.title("PDF-Code / Level"); w.geometry("1000x700")
-        ttk.Label(w,text=f"Original-Code aus dem PDF · Seite {lv.get('page','?')}",style="Level.TLabel").pack(anchor="w",padx=12,pady=10)
-        txt=tk.Text(w,wrap="none",font=("Consolas",10)); txt.pack(fill="both",expand=True,padx=12,pady=(0,12))
-        txt.insert("1.0",lv["pdf_code"]); txt.configure(state="disabled")
+        w=tk.Toplevel(self); w.title("Dokumentation / Lernhilfe"); w.geometry("1000x700")
+        ttk.Label(w,text=f"Lernhilfe · PDF Seite {lv.get('page','?')}",style="Level.TLabel").pack(anchor="w",padx=12,pady=10)
+        txt=tk.Text(w,wrap="word",font=("Arial",11)); txt.pack(fill="both",expand=True,padx=12,pady=(0,12))
+        txt.insert("1.0", "DEIN AUFTRAG\n\n"+lv.get("task","")+"\n\nHINWEIS\n"+lv.get("hint",""))
+        txt.insert(tk.END, "\n\nTECHNISCHES LERNZIEL\n")
+        txt.insert(tk.END, "Das Level basiert auf einem Code-Beispiel aus deinem Kursmaterial.\n")
+        txt.insert(tk.END, "Der Original-Code wird erst nach dem eigenen Versuch in der Referenzansicht gezeigt.\n")
+        txt.configure(state="disabled")
+
     def show_hint(self):
-        code=LEVELS[self.current]["pdf_code"]
-        if "groupby" in code: h="Denke an Gruppieren und danach an eine Aggregation."
-        elif "merge" in code or "JOIN" in code: h="Achte auf gemeinsame Schlüssel/IDs und den Join-Typ."
-        elif "plt." in code or "sns." in code: h="Erzeuge die Grafik aus den Daten. Ein Plot darf beliebig aufgebaut werden."
-        elif "SELECT " in code or "sqlite3" in code: h="Die Datenbank läuft lokal über SQLite. Nutze sqlite3, cursor.execute() oder pd.read_sql_query()."
-        elif "def " in code: h="Definiere die Funktion, berechne das Ergebnis und gib es mit return zurück."
-        elif "np.random" in code: h="Achte auf size, replace, loc, scale und seed."
-        else: h="Untersuche zuerst die Daten mit df.head(), df.info(), df.dtypes oder df.columns."
-        messagebox.showinfo("Hinweis",h)
+        lv=LEVELS[self.current]
+        messagebox.showinfo("Hinweis", lv.get("hint", "Untersuche zuerst die Daten und probiere eine passende pandas-/Python-Funktion aus."))
     def expected(self):
-        if self.current not in self.ref_cache: self.ref_cache[self.current]=get_reference(LEVELS[self.current])
-        return self.ref_cache[self.current]
+        return LEVELS[self.current].get("answer")
+    def _answer_matches(self, ans, lv):
+        mode=lv.get("answer_mode","text")
+        exp=str(lv.get("answer","")).strip()
+        if mode=="number":
+            a=parse_number(ans); b=parse_number(exp)
+            return a is not None and b is not None and abs(a-b)<1e-9
+        norm=normalize(ans)
+        if normalize(exp) == norm:
+            return True
+        options=lv.get("answer_options",[])
+        if any(norm==normalize(x) for x in options):
+            return True
+        return False
     def check_answer(self):
         ans=self.answer.get().strip()
         if not ans:
             messagebox.showwarning("Antwort fehlt","Bitte trage zuerst deine Antwort ein."); return
         if not self.last_run or not self.last_run["ok"]:
             messagebox.showwarning("Code zuerst ausführen","Führe deinen Code zuerst erfolgreich aus."); return
-        exp=self.expected()
-        code=LEVELS[self.current]["pdf_code"]
-        action=(("plt." in code or "sns." in code) or ("to_csv" in code or "savefig" in code)
-                or code.strip().startswith("#") or code.strip().startswith("help("))
-        if exp is not None:
-            a=parse_number(ans); b=parse_number(exp)
-            correct=(abs(a-b)<1e-9) if a is not None and b is not None else (normalize(ans)==normalize(exp))
-        elif action:
-            correct=True
-        else:
-            correct=True
-        if correct:
+        lv=LEVELS[self.current]
+        answer_ok=self._answer_matches(ans,lv)
+        # Wichtig: Der Spieler ist in seinem Lösungsweg frei.
+        # Es gibt bewusst KEINE Prüfung, ob eine bestimmte PDF-Codezeile oder
+        # ein bestimmter Funktionsname verwendet wurde. Nur das Ergebnis
+        # entscheidet über den Erfolg des Levels.
+        if answer_ok:
             new=self.gs.complete(self.current); self.refresh_level_list()
             msg="✅ LEVEL GESCHAFFT\n\n"
-            msg += (f"Referenzantwort: {exp}\n" if exp is not None else "Erfolgreiche Ausführung / offene Analyse bestätigt.\n")
-            if new: msg += "\n+100 XP"
-            messagebox.showinfo("Erfolg",msg); self.status.config(text="Level gelöst.")
+            msg += f"Deine Antwort: {ans}\n\n"
+            msg += "Du hast den Auftrag mit deinem eigenen Lösungsweg erledigt."
+            if new: msg += "\n\n+100 XP"
+            messagebox.showinfo("Erfolg",msg); self.status.config(text="Level gelöst – eigener Lösungsweg akzeptiert.")
         else:
-            messagebox.showerror("Noch nicht richtig","Die Antwort stimmt noch nicht mit der Referenz überein.")
+            messagebox.showerror("Noch nicht richtig", "Deine Antwort passt noch nicht zum Auftrag.\n\nDu kannst den Code weiter untersuchen und die Antwort erneut prüfen.")
     def show_reference(self):
-        lv=LEVELS[self.current]; exp=self.expected()
-        w=tk.Toplevel(self); w.title("Referenz / Lösung"); w.geometry("1000x750")
+        lv=LEVELS[self.current]
+        w=tk.Toplevel(self); w.title("Referenz / nach dem Versuch"); w.geometry("1050x780")
         txt=tk.Text(w,wrap="word",font=("Consolas",10)); txt.pack(fill="both",expand=True,padx=12,pady=12)
         txt.insert("1.0",f"LEVEL {self.current+1:03d}\n{lv['title']}\n\nAufgabe:\n{lv['task']}\n\n")
-        if exp is not None: txt.insert(tk.END,"Automatisch ermittelte Referenzantwort:\n"+exp+"\n\n")
-        else: txt.insert(tk.END,"Keine kurze eindeutige Referenzantwort automatisch erkannt.\nFür diesen Level ist die erfolgreiche Ausführung / eigene Analyse wichtig.\n\n")
-        txt.insert(tk.END,"Original-Code aus dem PDF:\n"+lv["pdf_code"]); txt.configure(state="disabled")
+        txt.insert(tk.END,"Erwartete Antwort:\n"+str(lv.get("answer",""))+"\n\n")
+        txt.insert(tk.END,"Warum ist das Level so formuliert?\n")
+        txt.insert(tk.END,"Der Auftrag wurde bewusst als reale Arbeitssituation formuliert. Du sollst zuerst selbst untersuchen und anschließend eine passende Lösung programmieren – nicht den PDF-Code abschreiben.\n\n")
+        txt.insert(tk.END,"Original-Code aus dem Kursmaterial (nur zur Nachkontrolle):\n"+lv.get("pdf_code", ""))
+        txt.configure(state="disabled")
+
 
 def main():
     SAVE_FILE.parent.mkdir(parents=True,exist_ok=True)
