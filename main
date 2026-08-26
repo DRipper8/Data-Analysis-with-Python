@@ -1,437 +1,1514 @@
+
+# -*- coding: utf-8 -*-
+"""
+DataFlow Analyst – Lernspiel für Python Data Analytics
+
+Basis: die Code-Beispiele aus "Codes_python_data_analytics.pdf".
+Jedes extrahierte Code-Beispiel ist ein eigenes Level.
+Der Spieler darf im Editor frei programmieren. Code und Antwort werden getrennt behandelt.
+
+SQL:
+Kein Server nötig. Bei jedem Lauf wird eine frische lokale SQLite-Datenbank
+database.sqlite erzeugt und mit realistischen Shop-/Transaktionsdaten befüllt.
+"""
 import json
 import os
-import subprocess
+import re
 import sys
 import tempfile
-import threading
-import tkinter as tk
+import subprocess
+import shutil
 from pathlib import Path
-from tkinter import messagebox, ttk
+import tkinter as tk
+from tkinter import ttk, messagebox
 
-
-# ============================================================
-# DataFlow Analyst - erster spielbarer Prototyp
-# ============================================================
-# Voraussetzungen:
-#   - Python 3
-#   - pandas
-#   - openpyxl
-#   - Excel-Datei unter data/orders.xlsx
-#
-# Start:
-#   python main.py
-# ============================================================
-
-BASE_DIR = Path(__file__).resolve().parent
-DATA_DIR = BASE_DIR / "data"
-SAVE_DIR = BASE_DIR / "save"
-DATA_FILE = DATA_DIR / "orders.xlsx"
-SAVE_FILE = SAVE_DIR / "progress.json"
-
-DATA_DIR.mkdir(exist_ok=True)
-SAVE_DIR.mkdir(exist_ok=True)
-
+APP_TITLE = "DATAFLOW ANALYST"
+RUN_TIMEOUT = 20
+SAVE_FILE = Path("save") / "progress.json"
+GAME_RUNTIME_DIR = Path("save") / "game_runtime"
 
 LEVELS = [
-    {
-        "id": 1,
-        "title": "Der erste Datensatz",
-        "description": (
-            "Lade die Datei orders.xlsx mit pandas und gib die Anzahl "
-            "der Bestellungen aus."
-        ),
-        "hint": "Hinweis: Verwende pd.read_excel(...) und danach len(df) oder df.shape[0].",
-        "xp": 100,
-        "check": lambda output: output.strip().splitlines()[-1].strip() == "650"
-        if output.strip()
-        else False,
-        "starter": (
-            "import pandas as pd\n\n"
-            "df = pd.read_excel('data/orders.xlsx', sheet_name='Bestellungen')\n\n"
-            "# Gib hier die Anzahl der Bestellungen aus.\n"
-        ),
-    },
-    {
-        "id": 2,
-        "title": "Was steckt in der Tabelle?",
-        "description": (
-            "Lade das Tabellenblatt Bestellungen und gib die Spaltennamen aus. "
-            "Alle 14 Spalten müssen in deiner Ausgabe vorkommen."
-        ),
-        "hint": "Hinweis: df.columns oder df.columns.tolist() hilft dir dabei.",
-        "xp": 150,
-        "required_tokens": [
-            "order_id",
-            "order_date",
-            "customer_id",
-            "product_id",
-            "quantity",
-            "gross_amount_chf",
-            "promo_code",
-            "discount_chf",
-            "shipping_chf",
-            "net_amount_chf",
-            "payment_method",
-            "status",
-            "shipping_city",
-            "channel",
-        ],
-        "check": lambda output: all(
-            token in output for token in LEVELS[1]["required_tokens"]
-        ),
-        "starter": (
-            "import pandas as pd\n\n"
-            "df = pd.read_excel('data/orders.xlsx', sheet_name='Bestellungen')\n\n"
-            "# Gib hier die Spaltennamen aus.\n"
-        ),
-    },
-    {
-        "id": 3,
-        "title": "Die grossen Bestellungen",
-        "description": (
-            "Finde heraus, wie viele Bestellungen mehr als 3 Produkte enthalten. "
-            "Gib nur die Anzahl aus."
-        ),
-        "hint": "Hinweis: Filtere mit df[df['quantity'] > 3] und zähle danach die Zeilen.",
-        "xp": 200,
-        "check": lambda output: output.strip().splitlines()[-1].strip() == "27"
-        if output.strip()
-        else False,
-        "starter": (
-            "import pandas as pd\n\n"
-            "df = pd.read_excel('data/orders.xlsx', sheet_name='Bestellungen')\n\n"
-            "# Filtere die Bestellungen und gib die Anzahl aus.\n"
-        ),
-    },
+  {
+    "title": "Code-Beispiel: print(\"Text\")",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "print(\"Text\")",
+    "page": 1
+  },
+  {
+    "title": "Code-Beispiel: variableName = (...)",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "variableName = (...)",
+    "page": 1
+  },
+  {
+    "title": "Code-Beispiel: pd.read_csv(filepath_or_buüer, sep=\",\", header=\"infer\", names=None, ..",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "pd.read_csv(filepath_or_buüer, sep=\",\", header=\"infer\", names=None, ...)",
+    "page": 1
+  },
+  {
+    "title": "Code-Beispiel: myData.to_csv(path_or_buf=\"file.csv\", sep=\",\", ...)",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.to_csv(path_or_buf=\"file.csv\", sep=\",\", ...)\nDataFrame unter dem angegebenen Dateinamen und Speicherort als CSV-Datei ab.",
+    "page": 1
+  },
+  {
+    "title": "Code-Beispiel: del DataFrame",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "del DataFrame",
+    "page": 1
+  },
+  {
+    "title": "Code-Beispiel: myData.dtypes",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.dtypes",
+    "page": 1
+  },
+  {
+    "title": "Code-Beispiel: myData.head(n=3)",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.head(n=3)",
+    "page": 1
+  },
+  {
+    "title": "Code-Beispiel: myData.tail(n=3)",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.tail(n=3)",
+    "page": 1
+  },
+  {
+    "title": "Code-Beispiel: myData.describe()",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.describe()",
+    "page": 1
+  },
+  {
+    "title": "",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "pd.Series([\"a\",\"b\",\"c\"], dtype=\"category\")",
+    "page": 2
+  },
+  {
+    "title": "Code-Beispiel: datetime.datetime(2009, 10, 5)",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "datetime.datetime(2009, 10, 5)",
+    "page": 2
+  },
+  {
+    "title": "Code-Beispiel: pd.to_datetime(myData[\"Spalte\"], format=\"%d.%m.%Y\", utc=True, dayfirst",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "pd.to_datetime(myData[\"Spalte\"], format=\"%d.%m.%Y\", utc=True, dayfirst=True):",
+    "page": 2
+  },
+  {
+    "title": "Code-Beispiel: myData.loc[row_index, \"column_name\"]",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.loc[row_index, \"column_name\"]",
+    "page": 2
+  },
+  {
+    "title": "Code-Beispiel: plt.hist(x=myData[\"Spalte\"], bins=10)",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "plt.hist(x=myData[\"Spalte\"], bins=10)",
+    "page": 2
+  },
+  {
+    "title": "Code-Beispiel: plt.scatter(x=myData[\"Spalte1\"], y=myData[\"Spalte2\"])",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "plt.scatter(x=myData[\"Spalte1\"], y=myData[\"Spalte2\"])",
+    "page": 2
+  },
+  {
+    "title": "Code-Beispiel: plt.plot(x, y, \"go\")",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "plt.plot(x, y, \"go\")",
+    "page": 2
+  },
+  {
+    "title": "Code-Beispiel: plt.plot(x, y, \"o\", color=\"green\")",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "plt.plot(x, y, \"o\", color=\"green\")",
+    "page": 2
+  },
+  {
+    "title": "Code-Beispiel: plt.show()",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "plt.show()",
+    "page": 2
+  },
+  {
+    "title": "Code-Beispiel: plt.xlabel(\"Text\", size=20, fontweight=\"bold\", color=\"green\")",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "plt.xlabel(\"Text\", size=20, fontweight=\"bold\", color=\"green\")",
+    "page": 2
+  },
+  {
+    "title": "Code-Beispiel: plt.ylabel(\"Text\", size=20, fontweight=\"bold\", color=\"blue\")",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "plt.ylabel(\"Text\", size=20, fontweight=\"bold\", color=\"blue\")",
+    "page": 2
+  },
+  {
+    "title": "Code-Beispiel: plt.title(\"Text\", style=\"italic\", color=\"red\")",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "plt.title(\"Text\", style=\"italic\", color=\"red\")",
+    "page": 2
+  },
+  {
+    "title": "Code-Beispiel: plt.xlim(min, max) / plt.ylim(min, max)",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "plt.xlim(min, max) / plt.ylim(min, max)",
+    "page": 2
+  },
+  {
+    "title": "Code-Beispiel: plt.text(x, y, \"Text\")",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "plt.text(x, y, \"Text\")",
+    "page": 2
+  },
+  {
+    "title": "Code-Beispiel: plt.subplot(rows, cols, index) (z.B. plt.subplot(1, 2, 1))",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "plt.subplot(rows, cols, index) (z.B. plt.subplot(1, 2, 1))",
+    "page": 2
+  },
+  {
+    "title": "Code-Beispiel: plt.suptitle(\"Text\")",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "plt.suptitle(\"Text\")",
+    "page": 2
+  },
+  {
+    "title": "Code-Beispiel: myData.shape[0]",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.shape",
+    "page": 4
+  },
+  {
+    "title": "Code-Beispiel: myData.shape[1]",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.shape",
+    "page": 4
+  },
+  {
+    "title": "Code-Beispiel: myData.columns.values",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.columns.values",
+    "page": 4
+  },
+  {
+    "title": "Code-Beispiel: len([2, 3, 5])",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "len([2, 3, 5])",
+    "page": 4
+  },
+  {
+    "title": "Code-Beispiel: len(\"hello\")",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "len(\"hello\")",
+    "page": 4
+  },
+  {
+    "title": "Code-Beispiel: myData.iloc[0, ] oder myData.iloc[[0], ]",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.iloc[0, ] oder myData.iloc[[0], ]",
+    "page": 4
+  },
+  {
+    "title": "Code-Beispiel: myData.iloc[0:3, ]",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.iloc[0:3, ]",
+    "page": 4
+  },
+  {
+    "title": "Code-Beispiel: myData.iloc[0:5]",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.iloc[0:5]",
+    "page": 4
+  },
+  {
+    "title": "Code-Beispiel: myData.iloc[0:0]",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.iloc[0:0]",
+    "page": 4
+  },
+  {
+    "title": "Code-Beispiel: myData.iloc[[0, 1, 2, 4], ]",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.iloc[[0, 1, 2, 4], ]",
+    "page": 4
+  },
+  {
+    "title": "Code-Beispiel: myData.iloc[[len(myData)-1], ]",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.iloc[[len(myData)-1], ]",
+    "page": 4
+  },
+  {
+    "title": "Code-Beispiel: myData.tail(1)",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.tail(1)",
+    "page": 4
+  },
+  {
+    "title": "Code-Beispiel: myData.sort_values([\"TransDate\"])",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.sort_values([\"TransDate\"])",
+    "page": 4
+  },
+  {
+    "title": "Code-Beispiel: myData.sort_values([\"TransDate\", \"Customer\"])",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.sort_values([\"TransDate\", \"Customer\"])",
+    "page": 4
+  },
+  {
+    "title": "Code-Beispiel: myData.sort_values([\"TransDate\", \"Customer\"], ascending=[0, 0])",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.sort_values([\"TransDate\", \"Customer\"], ascending=[0, 0])",
+    "page": 4
+  },
+  {
+    "title": "Code-Beispiel: myData.loc[myData[\"PurchAmount\"] > 100, ]",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.loc[myData[\"PurchAmount\"] > 100, ]",
+    "page": 4
+  },
+  {
+    "title": "Code-Beispiel: myData.loc[myData[\"Customer\"] == 149332, ]",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.loc[myData[\"Customer\"] == 149332, ]",
+    "page": 4
+  },
+  {
+    "title": "",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.loc[myData[\"Customer\"].isin([149332, 172951]), ]",
+    "page": 5
+  },
+  {
+    "title": "Code-Beispiel: myData.loc[~myData[\"Customer\"].isin([149332, 172951]), ]",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.loc[~myData[\"Customer\"].isin([149332, 172951]), ]",
+    "page": 5
+  },
+  {
+    "title": "Code-Beispiel: myData.loc[(myData[\"TransDate\"] > pd.to_datetime(\"2007-10-24\")) &",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.loc[(myData[\"TransDate\"] > pd.to_datetime(\"2007-10-24\")) &",
+    "page": 5
+  },
+  {
+    "title": "Code-Beispiel: myData.loc[ ",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.loc[",
+    "page": 5
+  },
+  {
+    "title": "Code-Beispiel: myData.iloc[ ",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.iloc[",
+    "page": 5
+  },
+  {
+    "title": "Code-Beispiel: myData[\"TransDate\"]",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData[\"TransDate\"]",
+    "page": 5
+  },
+  {
+    "title": "Code-Beispiel: myData[[\"Customer\", \"TransDate\", \"PurchAmount\"]]",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData[[\"Customer\", \"TransDate\", \"PurchAmount\"]]",
+    "page": 5
+  },
+  {
+    "title": "Code-Beispiel: myData.loc[myData[\"PurchAmount\"] > 100, [\"TransDate\", \"Cost\"]]",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.loc[myData[\"PurchAmount\"] > 100, [\"TransDate\", \"Cost\"]]",
+    "page": 5
+  },
+  {
+    "title": "Code-Beispiel: myData[[\"TransDate\", \"Cost\"]].loc[myData[\"PurchAmount\"] > 100, ]",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData[[\"TransDate\", \"Cost\"]].loc[myData[\"PurchAmount\"] > 100, ]",
+    "page": 5
+  },
+  {
+    "title": "Code-Beispiel: myData.append(pd.DataFrame([[...]], columns=myData.columns.values),",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.append(pd.DataFrame([[...]], columns=myData.columns.values),",
+    "page": 5
+  },
+  {
+    "title": "",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.drop(myData.index[0:3], inplace=True)",
+    "page": 6
+  },
+  {
+    "title": "Code-Beispiel: myData[\"NewCol\"] = myData[\"Cost\"].round()",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData[\"NewCol\"] = myData[\"Cost\"].round()",
+    "page": 6
+  },
+  {
+    "title": "Code-Beispiel: myData_modified = myData",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData_modified = myData",
+    "page": 6
+  },
+  {
+    "title": "Code-Beispiel: myData_modified = myData.copy()",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData_modified = myData.copy()",
+    "page": 6
+  },
+  {
+    "title": "Code-Beispiel: del myData[\"Quantity\"]",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "del myData[\"Quantity\"]",
+    "page": 6
+  },
+  {
+    "title": "Code-Beispiel: myData.drop([\"Quantity\", \"Cost\"], axis=1)",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.drop([\"Quantity\", \"Cost\"], axis=1)",
+    "page": 6
+  },
+  {
+    "title": "Code-Beispiel: myData.rename(columns = {\"PurchAmount\"",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.rename(columns = {\"PurchAmount\"",
+    "page": 6
+  },
+  {
+    "title": "Code-Beispiel: myData.groupby(\"Customer\").agg(new_col=(\"PurchAmount\", \"sum\")).reset_i",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.groupby(\"Customer\").agg(new_col=(\"PurchAmount\", \"sum\")).reset_index() -",
+    "page": 6
+  },
+  {
+    "title": "Code-Beispiel: myData.groupby(\"Customer\").agg(AggPurch=(\"PurchAmount\",",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.groupby(\"Customer\").agg(AggPurch=(\"PurchAmount\",",
+    "page": 6
+  },
+  {
+    "title": "Code-Beispiel: myData.groupby(\"Customer\").agg(AggPurch=(\"PurchAmount\", \"sum\"),",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.groupby(\"Customer\").agg(AggPurch=(\"PurchAmount\", \"sum\"),",
+    "page": 6
+  },
+  {
+    "title": "Code-Beispiel: myData.groupby([\"Customer\", \"TransDate\"]).agg(AggPurch=(\"PurchAmount\",",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.groupby([\"Customer\", \"TransDate\"]).agg(AggPurch=(\"PurchAmount\",",
+    "page": 6
+  },
+  {
+    "title": "",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.iloc[1:5].groupby(\"Customer\").agg(AggPurch=(\"PurchAmount\",",
+    "page": 7
+  },
+  {
+    "title": "Code-Beispiel: myData[\"PurchAmount\"].sum()",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData[\"PurchAmount\"].sum()",
+    "page": 7
+  },
+  {
+    "title": "Code-Beispiel: sum(), min(), max(), mean(), median(), std(), size(), count(), head(),",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "sum(), min(), max(), mean(), median(), std(), size(), count(), head(), tail(), transform(ro",
+    "page": 7
+  },
+  {
+    "title": "Code-Beispiel: myData[\"AggPurch\"] =",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData[\"AggPurch\"] =\nmyData.groupby(\"Customer\")[\"PurchAmount\"].transform(sum)",
+    "page": 7
+  },
+  {
+    "title": "Code-Beispiel: myData.groupby(myData[\"TransDate\"].dt.to_period(\"M\")).agg(AggPurch=(\"P",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.groupby(myData[\"TransDate\"].dt.to_period(\"M\")).agg(AggPurch=(\"PurchAm",
+    "page": 7
+  },
+  {
+    "title": "Chaining (Verkettung)",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.groupby(\"Customer\").agg(AggPurch=(\"PurchAmount\",",
+    "page": 7
+  },
+  {
+    "title": "Code-Beispiel: myData.sort_values([\"Customer\", \"TransDate\"]).groupby(\"Customer\").head",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.sort_values([\"Customer\", \"TransDate\"]).groupby(\"Customer\").head(3) -",
+    "page": 7
+  },
+  {
+    "title": "Code-Beispiel: myData.sort_values([\"Customer\", \"TransDate\"]).groupby(\"Customer\").tail",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData.sort_values([\"Customer\", \"TransDate\"]).groupby(\"Customer\").tail(1) -",
+    "page": 7
+  },
+  {
+    "title": "",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData[\"Count\"] = myData.groupby(\"Customer\")[\"Customer\"].transform(\"count\") -",
+    "page": 8
+  },
+  {
+    "title": "Code-Beispiel: myData[\"RelDate\"] = myData.groupby(\"Customer\").cumcount() + 1",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData[\"RelDate\"] = myData.groupby(\"Customer\").cumcount() + 1",
+    "page": 8
+  },
+  {
+    "title": "Code-Beispiel: myData[\"CostLag\"] = myData.groupby(\"Customer\")[\"Cost\"].shift(periods=1",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData[\"CostLag\"] = myData.groupby(\"Customer\")[\"Cost\"].shift(periods=1) -",
+    "page": 8
+  },
+  {
+    "title": "Code-Beispiel: myData[\"totSpend\"] = myData.groupby(\"Customer\")[\"Cost\"].cumsum()",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "myData[\"totSpend\"] = myData.groupby(\"Customer\")[\"Cost\"].cumsum()",
+    "page": 8
+  },
+  {
+    "title": "Code-Beispiel: sns.distplot(x, hist=False)",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "sns.distplot(x, hist=False)",
+    "page": 8
+  },
+  {
+    "title": "Code-Beispiel: sns.distplot(x, kde=False)",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "sns.distplot(x, kde=False)",
+    "page": 8
+  },
+  {
+    "title": "Code-Beispiel: sns.distplot(myData[\"PurchAmount\"], kde=False) gefolgt von plt.show()",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "sns.distplot(myData[\"PurchAmount\"], kde=False) gefolgt von plt.show()",
+    "page": 8
+  },
+  {
+    "title": "Code-Beispiel: sns.distplot(myData[\"PurchAmount\"], kde=False, vertical=True)",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "sns.distplot(myData[\"PurchAmount\"], kde=False, vertical=True)",
+    "page": 8
+  },
+  {
+    "title": "Code-Beispiel: sns.lmplot(x, y) oder sns.regplot(x, y)",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "sns.lmplot(x, y) oder sns.regplot(x, y)",
+    "page": 8
+  },
+  {
+    "title": "Code-Beispiel: sns.lmplot(x=\"PurchAmount\", y=\"Cost\", data=myData, fit_reg=False)",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "sns.lmplot(x=\"PurchAmount\", y=\"Cost\", data=myData, fit_reg=False)",
+    "page": 8
+  },
+  {
+    "title": "Code-Beispiel: sns.jointplot(x, y)",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "sns.jointplot(x, y)",
+    "page": 8
+  },
+  {
+    "title": "Code-Beispiel: sns.boxplot()",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "sns.boxplot()",
+    "page": 8
+  },
+  {
+    "title": "Code-Beispiel: sns.barplot()",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "sns.barplot()",
+    "page": 8
+  },
+  {
+    "title": "Code-Beispiel: sns.stripplot()",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "sns.stripplot()",
+    "page": 8
+  },
+  {
+    "title": "Code-Beispiel: sns.pointplot()",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "sns.pointplot()",
+    "page": 8
+  },
+  {
+    "title": "Code-Beispiel: plt.title(\"Costs by Purchase Amount\")",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "plt.title(\"Costs by Purchase Amount\")",
+    "page": 8
+  },
+  {
+    "title": "Code-Beispiel: plt.xlabel(\"Purchase Amount\") und plt.ylabel(\"Cost\")",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "plt.xlabel(\"Purchase Amount\") und plt.ylabel(\"Cost\")",
+    "page": 8
+  },
+  {
+    "title": "",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "sns.lmplot(..., scatter_kws={\"s\"",
+    "page": 9
+  },
+  {
+    "title": "Code-Beispiel: points = plt.scatter(myData[\"PurchAmount\"], myData[\"Cost\"], c=myData[\"",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "points = plt.scatter(myData[\"PurchAmount\"], myData[\"Cost\"], c=myData[\"Cost\"],",
+    "page": 9
+  },
+  {
+    "title": "Code-Beispiel: plt.colorbar(points)",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "plt.colorbar(points)",
+    "page": 9
+  },
+  {
+    "title": "Code-Beispiel: sns.lmplot(..., hue=\"Quantity\", palette=\"PuBuGn_d\")",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "sns.lmplot(..., hue=\"Quantity\", palette=\"PuBuGn_d\")",
+    "page": 9
+  },
+  {
+    "title": "Code-Beispiel: sns.set_palette(\"Accent\")",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "sns.set_palette(\"Accent\")",
+    "page": 9
+  },
+  {
+    "title": "Code-Beispiel: sns.set_style(\"darkgrid\")",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "sns.set_style(\"darkgrid\")",
+    "page": 9
+  },
+  {
+    "title": "Code-Beispiel: sns.axes_style()",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "sns.axes_style()",
+    "page": 9
+  },
+  {
+    "title": "Code-Beispiel: sns.set_style(\"darkgrid\", {\"grid.color\"",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "sns.set_style(\"darkgrid\", {\"grid.color\"",
+    "page": 9
+  },
+  {
+    "title": "Code-Beispiel: fig, ax = plt.subplots()",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "fig, ax = plt.subplots()",
+    "page": 9
+  },
+  {
+    "title": "Code-Beispiel: sns.regplot(x=\"PurchAmount\", y=\"Cost\", data=myData, fit_reg=False, ax=",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "sns.regplot(x=\"PurchAmount\", y=\"Cost\", data=myData, fit_reg=False, ax=ax)",
+    "page": 9
+  },
+  {
+    "title": "Code-Beispiel: sns.regplot(x=\"PurchAmount\", y=\"Cost\", data=myData, order=2, scatter=F",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "sns.regplot(x=\"PurchAmount\", y=\"Cost\", data=myData, order=2, scatter=False,",
+    "page": 9
+  },
+  {
+    "title": "Code-Beispiel: g = sns.FacetGrid(myData, col=\"Year\", col_wrap=3)",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "g = sns.FacetGrid(myData, col=\"Year\", col_wrap=3)",
+    "page": 9
+  },
+  {
+    "title": "Code-Beispiel: g = sns.FacetGrid(myData, col=\"Year\", hue=\"Quantity\", col_wrap=3)",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "g = sns.FacetGrid(myData, col=\"Year\", hue=\"Quantity\", col_wrap=3)",
+    "page": 9
+  },
+  {
+    "title": "Code-Beispiel: A.merge(B, how=\"inner\", on=\"ID\") bzw. myData.merge(CustData, how=\"inne",
+    "task": "Führt einen Inner Join zwischen den Tabellen A und B durch. Es \nwerden nur Zeilen ausgegeben, deren Schlüssel (\"ID\" bzw. \"Customer\") in beiden \nDatensätzen existieren.",
+    "pdf_code": "A.merge(B, how=\"inner\", on=\"ID\") bzw. myData.merge(CustData, how=\"inner\",",
+    "page": 11
+  },
+  {
+    "title": "Code-Beispiel: A.merge(B, how=\"outer\", on=\"ID\") bzw. myData.merge(CustData, how=\"oute",
+    "task": "Führt einen Full Outer Join durch. Es werden alle Daten aus \nbeiden Tabellen behalten; nicht vorhandene Gegenstücke werden mit \nFehlwerten (NaN/NaT) aufgefüllt.",
+    "pdf_code": "A.merge(B, how=\"outer\", on=\"ID\") bzw. myData.merge(CustData, how=\"outer\",",
+    "page": 11
+  },
+  {
+    "title": "Code-Beispiel: A.merge(B, how=\"left\", on=\"ID\") bzw. myData.merge(CustData, how=\"left\"",
+    "task": "Führt einen Left Outer Join durch. Es werden alle \nBeobachtungen der linken Tabelle (A) behalten, aber nur die übereinstimmenden \nZeilen der rechten Tabelle (B) angehängt.",
+    "pdf_code": "A.merge(B, how=\"left\", on=\"ID\") bzw. myData.merge(CustData, how=\"left\",",
+    "page": 11
+  },
+  {
+    "title": "Code-Beispiel: A.merge(B, how=\"right\", on=\"ID\") bzw. myData.merge(CustData, how=\"righ",
+    "task": "Führt einen Right Outer Join durch. Alle Beobachtungen der \nrechten Tabelle (B) bleiben erhalten, während aus der linken Tabelle (A) nur die \npassenden Zeilen angehängt werden.",
+    "pdf_code": "A.merge(B, how=\"right\", on=\"ID\") bzw. myData.merge(CustData, how=\"right\",",
+    "page": 11
+  },
+  {
+    "title": "Code-Beispiel: A.merge(B, how=\"inner\", left_on=\"ID\", right_on=\"CustID\")",
+    "task": "Ermöglicht das Zusammenführen von Tabellen, wenn die \nSchlüsselspalten unterschiedliche Namen haben (\"ID\" in Tabelle A und \n\"CustID\" in Tabelle B).",
+    "pdf_code": "A.merge(B, how=\"inner\", left_on=\"ID\", right_on=\"CustID\")",
+    "page": 11
+  },
+  {
+    "title": "Code-Beispiel: A.merge(B, on=[\"ID\", \"TransDate\"])",
+    "task": "Führt einen Merge anhand von mehreren Identifikatoren \n(Spalten \"ID\" und \"TransDate\") gleichzeitig durch.",
+    "pdf_code": "A.merge(B, on=[\"ID\", \"TransDate\"])",
+    "page": 11
+  },
+  {
+    "title": "Code-Beispiel: myData.merge(CustData, how=\"inner\", left_on=[\"Customer\",\"TransDate\"],",
+    "task": "Ein fortgeschrittener Inner Join über mehrere Identifikatoren, bei \ndenen die Datumsspalten in den Quelltabellen unterschiedliche Namen besitzen \n(\"TransDate\" in Tabelle A und \"JoinDate\" in Tabelle B).",
+    "pdf_code": "myData.merge(CustData, how=\"inner\", left_on=[\"Customer\",\"TransDate\"],",
+    "page": 11
+  },
+  {
+    "title": "Code-Beispiel: pd.merge(myData, CustData, on=\"Customer\")",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "pd.merge(myData, CustData, on=\"Customer\")",
+    "page": 11
+  },
+  {
+    "title": "Code-Beispiel: myData.dropna()",
+    "task": "Löscht oder filtert alle Zeilen aus dem DataFrame heraus, die \nmindestens einen fehlenden Wert (NaN/NaT) enthalten.",
+    "pdf_code": "myData.dropna()",
+    "page": 12
+  },
+  {
+    "title": "Code-Beispiel: myData.loc[pd.isnull(myData[\"PurchAmount\"]), ]",
+    "task": "Selektiert gezielt nur diejenigen Zeilen, in denen der Wert in der \nSpalte \"PurchAmount\" fehlt (NaN).",
+    "pdf_code": "myData.loc[pd.isnull(myData[\"PurchAmount\"]), ]",
+    "page": 12
+  },
+  {
+    "title": "Code-Beispiel: myData.loc[myData[\"PurchAmount\"] == None, ]",
+    "task": "Achtung, fehlerhafter Code! Dieser Ansatz ist falsch und liefert \nkeine Einträge zurück, wenn nach fehlenden Werten gesucht wird.",
+    "pdf_code": "myData.loc[myData[\"PurchAmount\"] == None, ]",
+    "page": 12
+  },
+  {
+    "title": "Code-Beispiel: myData.loc[ ~ pd.isnull(myData[\"PurchAmount\"]), ]",
+    "task": "Selektiert Zeilen, in denen \"PurchAmount\" nicht fehlt. Die Tilde \n(~) dient als logischer Nicht-Operator zur Invertierung der Bedingung. \n \n3. Mathematische Aggregationen in Pandas und NumPy",
+    "pdf_code": "myData.loc[ ~ pd.isnull(myData[\"PurchAmount\"]), ]",
+    "page": 12
+  },
+  {
+    "title": "Code-Beispiel: np.mean([1, 2, np.nan, 3])",
+    "task": "Standard-Mittelwertberechnung von NumPy. Sie gibt das \nErgebnis nan zurück, sobald sich auch nur ein einziger fehlender Wert in der \nListe befindet.",
+    "pdf_code": "np.mean([1, 2, np.nan, 3])",
+    "page": 12
+  },
+  {
+    "title": "Code-Beispiel: np.nanmean([1, 2, np.nan, 3])",
+    "task": "Berechnet den Mittelwert einer Liste und ignoriert NaNs \n(Ergebnis ist hier 2).",
+    "pdf_code": "np.nanmean([1, 2, np.nan, 3])",
+    "page": 12
+  },
+  {
+    "title": "Code-Beispiel: myData.groupby(\"Customer\")[\"PurchAmount\"].mean()",
+    "task": "Gruppiert die Daten nach \"Customer\" und berechnet den \nMittelwert von \"PurchAmount\" für jeden Kunden, wobei fehlende Werte (NaNs) \nautomatisch ausgelassen werden.",
+    "pdf_code": "myData.groupby(\"Customer\")[\"PurchAmount\"].mean()",
+    "page": 12
+  },
+  {
+    "title": "Code-Beispiel: transactions.groupby(\"Customer\").agg(AggPurch=(\"PurchAmount\",",
+    "task": "Gruppiert Transaktionen nach \"Customer\", summiert die Spalte \n\"PurchAmount\", benennt die neue Spalte \"AggPurch\" und setzt den Index zurück.",
+    "pdf_code": "transactions.groupby(\"Customer\").agg(AggPurch=(\"PurchAmount\",",
+    "page": 12
+  },
+  {
+    "title": "Code-Beispiel: transactions.groupby(\"Customer\").agg(AggPurch=(\"PurchAmount\", \"sum\"),",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "transactions.groupby(\"Customer\").agg(AggPurch=(\"PurchAmount\", \"sum\"),",
+    "page": 12
+  },
+  {
+    "title": "Code-Beispiel: transactions.groupby(transactions[\"TransDate\"].dt.to_period(\"M\")).agg(",
+    "task": "Aggregiert die Kaufsummen (\"PurchAmount\") taggenauer \nTransaktionen auf monatlicher Basis über das transformierte \nTransaktionsdatum. \n \n4. Datenbank-Verbindungsaufbau (sqlite3 in Python) \nDiese Befehle steuern die Kommunikation und Infrastruktur mit einer SQLite-Datenbank über \ndas Python-Standardmodul sqlite3.",
+    "pdf_code": "transactions.groupby(transactions[\"TransDate\"].dt.to_period(\"M\")).agg(AggPurch=(\"",
+    "page": 13
+  },
+  {
+    "title": "Code-Beispiel: import sqlite3",
+    "task": "Lädt das benötigte SQLite-Datenbankmodul in Python.",
+    "pdf_code": "import sqlite3",
+    "page": 13
+  },
+  {
+    "title": "Code-Beispiel: cursor.execute(\"SELECT name FROM sqlite_master;\")",
+    "task": "Übergibt eine SQL-Abfrage an den Cursor, um die Namen aller \nexistierenden Tabellen in der SQLite-Datenbank abzufragen.",
+    "pdf_code": "cursor.execute(\"SELECT name FROM sqlite_master;\")",
+    "page": 13
+  },
+  {
+    "title": "Code-Beispiel: cursor.fetchall()",
+    "task": "Ruft die Daten ab, die durch den zuvor ausgeführten Befehl vom \nCursor ermittelt wurden (Datenabruf).",
+    "pdf_code": "cursor.fetchall()",
+    "page": 13
+  },
+  {
+    "title": "Code-Beispiel: pd.read_sql_query(\"SELECT * FROM transactions;\", con)",
+    "task": "Sendet eine SQL-Query an die Datenbank, führt diese aus und \nlädt die zurückgegebenen Tabellendaten direkt als Pandas DataFrame in \nPython.",
+    "pdf_code": "pd.read_sql_query(\"SELECT * FROM transactions;\", con)",
+    "page": 13
+  },
+  {
+    "title": "Code-Beispiel: DataFrame.to_sql(con=con, name=\"new_table\")",
+    "task": "Kopiert einen in Python vorhandenen Pandas DataFrame als \nneue Tabelle (\"new_table\") direkt in die verbundene SQL-Datenbank.",
+    "pdf_code": "DataFrame.to_sql(con=con, name=\"new_table\")",
+    "page": 13
+  },
+  {
+    "title": "Code-Beispiel: cursor.execute(\"DROP TABLE new_table\")",
+    "task": "Bereitet das Löschen der Tabelle \"new_table\" aus der \nDatenbank über den Cursor vor.",
+    "pdf_code": "cursor.execute(\"DROP TABLE new_table\")",
+    "page": 13
+  },
+  {
+    "title": "",
+    "task": "Speichert alle via Cursor vorgenommenen Änderungen (z. B. \ngelöschte oder hinzugefügte Tabellen) dauerhaft in der Original-Datenbankdatei \nab.",
+    "pdf_code": "con.commit()",
+    "page": 14
+  },
+  {
+    "title": "Code-Beispiel: con.close()",
+    "task": "Schließt die Verbindung zur Datenbank, um Systemressourcen \nwieder freizugeben. \n \n5. SQL-Befehle (über Python ausgeführt) \nDiese Befehle zeigen die SQL-Syntax zur direkten Datenmanipulation und -abfrage. \nFiltern und Selektieren (Select-Operationen)",
+    "pdf_code": "con.close()",
+    "page": 14
+  },
+  {
+    "title": "Code-Beispiel: SELECT * FROM transactions WHERE PurchAmount > 100; (analog zu",
+    "task": "Filtert Zeilen aus der Tabelle \"transactions\", bei denen der \nKaufbetrag (\"PurchAmount\") größer als 100 ist.",
+    "pdf_code": "SELECT * FROM transactions WHERE PurchAmount > 100; (analog zu\ntransactions.loc[transactions[\"PurchAmount\"]>100,])",
+    "page": 14
+  },
+  {
+    "title": "Code-Beispiel: SELECT Customer, TransDate, PurchAmount FROM transactions; (analog zu",
+    "task": "Selektiert nur die spezifischen Spalten \"Customer\", \"TransDate\" \nund \"PurchAmount\" aus der Transaktionstabelle.",
+    "pdf_code": "SELECT Customer, TransDate, PurchAmount FROM transactions; (analog zu\ntransactions[[\"Customer\", \"TransDate\", \"PurchAmount\"]])",
+    "page": 14
+  },
+  {
+    "title": "Code-Beispiel: SELECT TransDate, Cost FROM transactions WHERE PurchAmount > 100; (ana",
+    "task": "Kombiniert Zeilenfilterung (Kaufbetrag > 100) mit \nSpaltenselektion (nur Transaktionsdatum und Kosten). \nTabellen-Updates und Manipulation",
+    "pdf_code": "SELECT TransDate, Cost FROM transactions WHERE PurchAmount > 100; (analog zu\ntransactions.loc[transactions[\"PurchAmount\"]>100, [\"TransDate\", \"Cost\"]])",
+    "page": 14
+  },
+  {
+    "title": "Code-Beispiel: INSERT INTO transactions (Customer, TransDate, Quantity, PurchAmount, ",
+    "task": "Fügt der Tabelle \"transactions\" eine neue Datenzeile hinzu. \nFehlende Spaltenwerte würden automatisch mit NAs befüllt werden.",
+    "pdf_code": "INSERT INTO transactions (Customer, TransDate, Quantity, PurchAmount, Cost)",
+    "page": 14
+  },
+  {
+    "title": "Code-Beispiel: ALTER TABLE transactions ADD NewCol; (analog zu transactions[\"NewCol\"]",
+    "task": "Fügt der bestehenden Tabelle \"transactions\" eine neue, leere \nSpalte namens \"NewCol\" hinzu. \nSQL Tabellen-Aggregationen",
+    "pdf_code": "ALTER TABLE transactions ADD NewCol; (analog zu transactions[\"NewCol\"] = ...)",
+    "page": 14
+  },
+  {
+    "title": "Code-Beispiel: SELECT Customer, SUM(PurchAmount) AS AggPurch FROM transactions GROUP ",
+    "task": "Summiert die Spalte \"PurchAmount\" pro Kunde (\"GROUP BY \nCustomer\") und benennt die berechnete Spalte in \"AggPurch\" um.",
+    "pdf_code": "SELECT Customer, SUM(PurchAmount) AS AggPurch FROM transactions GROUP BY",
+    "page": 14
+  },
+  {
+    "title": "Code-Beispiel: SELECT DATE(TransDate, 'start of month') ...",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "SELECT DATE(TransDate, 'start of month') ...",
+    "page": 14
+  },
+  {
+    "title": "Code-Beispiel: SELECT * FROM A INNER JOIN B ON A.ID = B.ID; (analog zu A.merge(B, how",
+    "task": "SQL-Syntax für einen Inner Join zweier Tabellen über ein \ngemeinsames ID-Feld.",
+    "pdf_code": "SELECT * FROM A INNER JOIN B ON A.ID = B.ID; (analog zu A.merge(B, how=\"inner\",",
+    "page": 15
+  },
+  {
+    "title": "Code-Beispiel: SELECT * FROM A LEFT JOIN B ON A.ID = B.ID; (analog zu A.merge(B, how=",
+    "task": "SQL-Syntax für einen Left Outer Join.",
+    "pdf_code": "SELECT * FROM A LEFT JOIN B ON A.ID = B.ID; (analog zu A.merge(B, how=\"left\",",
+    "page": 15
+  },
+  {
+    "title": "Code-Beispiel: SELECT * FROM A INNER JOIN B ON A.ID = B.ID AND A.TransDate = B.TransD",
+    "task": "Führt einen Inner Join über mehrere Identifikatoren mit der \nlogischen Verknüpfung AND aus.",
+    "pdf_code": "SELECT * FROM A INNER JOIN B ON A.ID = B.ID AND A.TransDate = B.TransDate;",
+    "page": 15
+  },
+  {
+    "title": "Code-Beispiel: SELECT * FROM X FULL OUTER JOIN Y ON X.ID=Y.ID;",
+    "task": "Führt einen nativen Full Outer Join aus (unterstützt von Systemen \nwie MySQL oder SQL Server, jedoch nicht standardmäßig von SQLite).",
+    "pdf_code": "SELECT * FROM X FULL OUTER JOIN Y ON X.ID=Y.ID;",
+    "page": 15
+  },
+  {
+    "title": "Code-Beispiel: SELECT * FROM X RIGHT JOIN Y ON X.ID=Y.ID;",
+    "task": "Führt einen nativen Right Join aus (unterstützt von Systemen wie \nMySQL oder SQL Server, jedoch nicht standardmäßig von SQLite). \nSQLite-Workaround: Full Outer Join erzwingen",
+    "pdf_code": "SELECT * FROM X RIGHT JOIN Y ON X.ID=Y.ID;",
+    "page": 15
+  },
+  {
+    "title": "Code-Beispiel: SELECT * FROM A LEFT JOIN B ON A.ID = B.ID UNION ALL SELECT * FROM B L",
+    "task": "Da SQLite keinen nativen FULL OUTER JOIN unterstützt, wird \ndieser hier simuliert. Der Code kombiniert einen Left Join von A auf B mit einem \nLeft Join von B auf A (wobei bereits in beiden Tabellen vorkommende Elemente \nausgeschlossen werden) über ein UNION ALL.",
+    "pdf_code": "SELECT * FROM A LEFT JOIN B ON A.ID = B.ID UNION ALL SELECT * FROM B LEFT JOIN",
+    "page": 15
+  },
+  {
+    "title": "Einfache if-Anweisung:",
+    "task": "Führt einen eingerückten Codeblock nur dann aus, wenn die angegebene \nBedingung wahr (True) ist. Die korrekte Einrückung nach dem Doppelpunkt ist in Python \nzwingend erforderlich.",
+    "pdf_code": "x = -3\nif x < 0:\nprint(\"x is a negative number\")",
+    "page": 16
+  },
+  {
+    "title": "else-Anweisung:",
+    "task": "Ergänzt eine if-Bedingung. Der Codeblock unter else wird ausgeführt, wenn die \nvorherige if-Bedingung unwahr (False) ist.",
+    "pdf_code": "if x < 0:\nprint(\"x is a negative number\")\nelse:\nprint(\"x is either a positive number or zero\")",
+    "page": 16
+  },
+  {
+    "title": "elif-Anweisung (Else If):",
+    "task": "Ermöglicht das Prüfen einer zusätzlichen Bedingung, die nur dann ausgewertet \nwird, wenn die vorherigen Bedingungen falsch waren. Falls alle Bedingungen unwahr sind, wird \ndie else-Klausel ausgeführt. \n \n2. Schleifen und Iteration (Looping)",
+    "pdf_code": "if x < 0:\nprint(\"x is a negative number\")\nelif x == 0:\nprint(\"x is zero\")\nelse:\nprint(\"x is a positive number\")",
+    "page": 16
+  },
+  {
+    "title": "while-Schleife:",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "x = 1\nwhile x <= 7:\nprint(\"x is set to \" + str(x))\nx = x + 1",
+    "page": 16
+  },
+  {
+    "title": "Einfache for-Schleife über eine Sequenz:",
+    "task": "Iteriert über alle Elemente einer Sequenz (z. B. einer Liste) und gibt sie \nnacheinander in ihrer ursprünglichen Reihenfolge aus.",
+    "pdf_code": "cities = [\"New York\", \"Paris\", \"London\", \"Tokyo\", \"Cape Town\"]\nfor city in cities:\nprint(city)",
+    "page": 17
+  },
+  {
+    "title": "Schleifen vorzeitig abbrechen mit break:",
+    "task": "Beendet die Schleife sofort, sobald die break-Anweisung erreicht wird. \nNachfolgende Elemente der Sequenz werden nicht mehr verarbeitet.",
+    "pdf_code": "for city in cities:\nif city == \"London\":",
+    "page": 17
+  },
+  {
+    "title": "Durchläufe überspringen mit continue:",
+    "task": "Überspringt lediglich den aktuellen Schleifendurchlauf für das betroüene \nElement und springt direkt zum nächsten Element der Sequenz.",
+    "pdf_code": "for city in cities:\nif city == \"London\":",
+    "page": 17
+  },
+  {
+    "title": "Iterieren über numerische Indizes (range(len(...))):",
+    "task": "Nutzt eine Kombination aus len() und range(), um über die numerischen Indizes \nder Liste zu iterieren, anstatt direkt über die Werte. Dies bietet beim Programmieren oft mehr \nFlexibilität, da die Position des Elements im Vektor bekannt ist und Berechnungen meist \nschneller sind.",
+    "pdf_code": "for i in range(len(cities)):\nprint(cities[i])",
+    "page": 17
+  },
+  {
+    "title": "Ergebnisse in einer Liste speichern (append):",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "wordLength = []\nfor i in range(len(cities)):\nwordLength.append(len(cities[i]))",
+    "page": 17
+  },
+  {
+    "title": "Schleifen durch map() ersetzen:",
+    "task": "Wendet eine Funktion (hier len) direkt auf alle Elemente einer Sequenz an und \nliefert ein Iterator-Objekt zurück, das mit list() in eine Liste umgewandelt werden kann. Dies \nspart Codezeilen und vermeidet explizite Schleifen.",
+    "pdf_code": "list(map(len, cities))",
+    "page": 18
+  },
+  {
+    "title": "Vektorisierung mit NumPy:",
+    "task": "Erstellt ein NumPy-Array, wodurch arithmetische Berechnungen direkt auf dem \ngesamten Vektor gleichzeitig (vektorisiert) stattfinden können. Vektorisiertes Code-Schreiben ist \nin Python deutlich schneller als Schleifen und erfordert weniger Zeilen. \n \n3. Funktionen erstellen",
+    "pdf_code": "import numpy as np\na = np.array([1-3])",
+    "page": 18
+  },
+  {
+    "title": "Einfache Funktion definieren:",
+    "task": "Definiert eine Funktion mit einem Argument x und einem Standardparameter \ny=1. Der Funktionsrumpf berechnet die Summe, und die return-Anweisung beendet die Funktion \nund gibt das Ergebnis an den Aufrufer zurück.",
+    "pdf_code": "def add(x, y=1):\nresult = x + y\nreturn result",
+    "page": 18
+  },
+  {
+    "title": "Entwicklung einer Funktion am Beispiel der ROI-Berechnung:",
+    "task": "Setze das im PDF gezeigte Code-Beispiel eigenständig um. Du darfst zuerst frei untersuchen.",
+    "pdf_code": "import pandas as pd",
+    "page": 18
+  },
+  {
+    "title": "Mehrere Werte zurückgeben:",
+    "task": "Funktionen können mehrere Objekte gleichzeitig zurückgeben, indem diese als \nListe verpackt werden. Einzelne Ergebnis-Komponenten können im Anschluss über Indizes (z. B. \nresult) extrahiert werden.",
+    "pdf_code": "def KPIs(x, r, c):\nx = pd.DataFrame(x)\nprofit = sum(x[r])\nroi = profit / sum(x[r]) * 100\nreturn [profit, roi]",
+    "page": 19
+  },
+  {
+    "title": "Mathematische Standardabweichung (NumPy):",
+    "task": "np.std() berechnet direkt die Standardabweichung und erspart das manuelle \nTippen der mathematischen Kombination aus Wurzel (np.sqrt()) und Varianz (np.var()). \n \n4. Automatische Erstellung von Sequenzen",
+    "pdf_code": "import numpy as np\nnp.sqrt(np.var([2-5, 34]))\nnp.std([2-5, 34])",
+    "page": 19
+  },
+  {
+    "title": "Einfache Ganzzahl-Folgen (range):",
+    "task": "Erstellt eine Folge von Ganzzahlen. Die rechte Grenze ist dabei ausgeschlossen \n(erzeugt 2 bis 12). Diese Funktion ist speichereüizient, da sie Zahlen erst bei Bedarf generiert.",
+    "pdf_code": "range(2, 13)",
+    "page": 19
+  },
+  {
+    "title": "Gleichmäßige NumPy-Sequenzen (np.arange):",
+    "task": "Erstellt Arrays mit gleichmäßigen Abständen unter Angabe einer Schrittweite \n(step). Funktioniert im Gegensatz zu range() auch mit Fließkommazahlen.",
+    "pdf_code": "np.arange(start=1, stop=12, step=3)         # Ausgabe\nnp.arange(start=1.25, stop=6.25, step=0.25)  # Dezimalzahlen",
+    "page": 19
+  },
+  {
+    "title": "Buchstaben-Sequenzen:",
+    "task": "Generiert eine Liste von Kleinbuchstaben (hier die ersten fünf: ['a', 'b', 'c', 'd', 'e']). \nGroßbuchstaben können über string.ascii_uppercase abgerufen werden.",
+    "pdf_code": "import string\nlist(string.ascii_lowercase)[0:5]",
+    "page": 19
+  },
+  {
+    "title": "Code-Beispiel: pd.date_range(start='1/1/2011', end='03/31/2011', freq=\"MS\")",
+    "task": "Erzeugt eine Sequenz von Datumswerten. Über den Parameter freq wird das \nIntervall gesteuert (z. B. \"MS\" für den Monatsanfang).",
+    "pdf_code": "pd.date_range(start='1/1/2011', end='03/31/2011', freq=\"MS\")",
+    "page": 20
+  },
+  {
+    "title": "Vektoren replizieren (np.tile):",
+    "task": "Wiederholt eine gesamte Sequenz oder einen Vektor eine bestimmte Anzahl von \nMalen (reps) hintereinander.",
+    "pdf_code": "np.tile(range(1, 13), reps=3)",
+    "page": 20
+  },
+  {
+    "title": "Einzelne Elemente wiederholen (np.repeat):",
+    "task": "Wiederholt jedes Element eines Vektors nacheinander einzeln so oft, wie im \nParameter repeats angegeben.",
+    "pdf_code": "np.repeat(range(1, 13), repeats=3)",
+    "page": 20
+  },
+  {
+    "title": "Alle möglichen Permutationen bilden (itertools.product):",
+    "task": "Bildet alle Kombinationen (das kartesische Produkt) der übergebenen Vektoren. \nDas Ergebnis kann direkt in ein Pandas DataFrame konvertiert werden.",
+    "pdf_code": "list(itertools.product(range(165, 168), [\"1\", \"2\"]))",
+    "page": 20
+  },
+  {
+    "title": "Duplikate entfernen und einzigartige Werte finden:",
+    "task": "drop_duplicates() entfernt doppelte Zeilen aus einem DataFrame. pd.unique() \nliefert alle einzigartigen Werte einer Spalte als Array zurück. \n \n5. String-Manipulation und Simulation",
+    "pdf_code": "CustData.drop_duplicates()",
+    "page": 20
+  },
+  {
+    "title": "Zufällige Namen generieren (names):",
+    "task": "Ermöglicht das zufällige Ziehen von Vor- und Nachnamen. Ein Gender-Parameter \nist nur bei vollständigen Namen und Vornamen zulässig.",
+    "pdf_code": "import names\nnames.get_full_name(gender=\"female\")  # Vollständiger Name\nnames.get_first_name(gender=\"female\") # Nur Vorname\nnames.get_last_name()                 # Nur Nachname",
+    "page": 20
+  },
+  {
+    "title": "Mit Nullen auüüllen (zfill):",
+    "task": "Füllt numerische Werte (nach String-Konvertierung) mit führenden Nullen auf \neine feste Breite auf.",
+    "pdf_code": "ids =",
+    "page": 21
+  },
+  {
+    "title": "Vektorisierte Suche nach Zeichenketten:",
+    "task": "Erzeugt mithilfe von List Comprehension ein logisches Array (True/False), das \nanzeigt, in welchen Elementen der gesuchte String enthalten ist.",
+    "pdf_code": "friends = ['Nicholas', 'Thomas', 'Kayla']",
+    "page": 21
+  },
+  {
+    "title": "Strings aufteilen (split):",
+    "task": "Zerlegt einen String an einem bestimmten Trennzeichen (hier Leerzeichen) in \neine Liste von Teilstrings.",
+    "pdf_code": "firstname.split(\" \", 1)",
+    "page": 21
+  },
+  {
+    "title": "Anonymisierung über Hashing:",
+    "task": "Nutzt die irreversible Einwegfunktion hash, um Klartext-IDs oder Namen in \neindeutige numerische Hash-Werte umzuwandeln.",
+    "pdf_code": "list(map(hash, CustData[\"CustId\"]))",
+    "page": 21
+  },
+  {
+    "title": "Konvertieren und Verbinden:",
+    "task": "Konvertiert Datentypen mittels .astype(str) in Strings und verknüpft sie über den \n+-Operator zu einer neuen ID.",
+    "pdf_code": "CustData[\"Store_Cust\"] = CustData[\"Store\"].astype(str) + \"_\" + CustData[\"CustId\"].astype(str)",
+    "page": 21
+  },
+  {
+    "title": "Zufallsauswahl aus diskreten Werten (np.random.choice):",
+    "task": "Zieht eine Stichprobe einer definierten Größe (size) aus einer diskreten Menge. \nStandardmäßig wird eine Gleichverteilung angenommen.",
+    "pdf_code": "np.random.choice(10, size=5, replace=False)",
+    "page": 22
+  },
+  {
+    "title": "Normalverteilung simulieren (np.random.normal):",
+    "task": "Generiert Zufallszahlen, die einer Normalverteilung (Gauß-Verteilung) mit \ndefiniertem Mittelwert (loc) und Standardabweichung (scale) folgen.",
+    "pdf_code": "np.random.normal(loc=5.0, scale=1.0, size=500)",
+    "page": 22
+  },
+  {
+    "title": "Zufallssamen festlegen (np.random.seed):",
+    "task": "Setzt den internen Startwert des Zufallsgenerators fest, sodass bei jedem \nerneuten Ausführen des Codes exakt dieselben Zufallszahlen reproduziert werden. Der Seed \nmuss vor jedem Funktionsaufruf, der Zufallswerte generiert, zurückgesetzt werden.",
+    "pdf_code": "np.random.seed(1)\nnp.random.normal(size=5)",
+    "page": 22
+  }
 ]
 
+def find_workbook():
+    candidates = [
+        Path("data") / "orders.xlsx",
+        Path("data") / "uebungsdatensatz_data_wrangling_online_shop.xlsx",
+        Path("uebungsdatensatz_data_wrangling_online_shop.xlsx"),
+    ]
+    return next((p for p in candidates if p.exists()), None)
 
-class DataFlowGame:
-    def __init__(self, root: tk.Tk):
-        self.root = root
-        self.root.title("DataFlow Analyst")
-        self.root.geometry("1250x800")
-        self.root.minsize(1050, 700)
+def _synthetic_shop_data():
+    import pandas as pd
+    import numpy as np
+    rng = np.random.default_rng(42)
+    n_customers, n_orders = 120, 650
+    ids = np.arange(1001, 1001+n_customers)
+    customers = pd.DataFrame({
+        "customer_id": ids,
+        "name": [f"Customer {i}" for i in ids],
+        "gender": rng.choice(["female","male"], n_customers),
+        "age": rng.integers(18,70,n_customers),
+        "city": rng.choice(["Zurich","Bern","Basel","Lucerne","Geneva"], n_customers),
+        "postal_code": rng.integers(1000,9999,n_customers),
+        "segment": rng.choice(["Standard","Premium","VIP"], n_customers),
+        "acquisition_channel": rng.choice(["organic","social","email","paid"], n_customers),
+        "registration_date": pd.date_range("2023-01-01", periods=n_customers, freq="5D"),
+    })
+    pids=np.arange(2001,2036)
+    products=pd.DataFrame({
+        "product_id":pids,
+        "product_name":[f"Product {i}" for i in pids],
+        "category":rng.choice(["Electronics","Home","Sport","Beauty","Books"],35),
+        "brand":rng.choice(["Brand A","Brand B","Brand C"],35),
+        "price_chf":np.round(rng.uniform(10,450,35),2),
+        "cost_chf":np.round(rng.uniform(5,250,35),2),
+        "stock":rng.integers(0,100,35)
+    })
+    dates=pd.to_datetime("2025-01-01")+pd.to_timedelta(rng.integers(0,365,n_orders),unit="D")
+    qty=rng.integers(1,6,n_orders)
+    price=rng.choice(products["price_chf"],n_orders)
+    gross=np.round(qty*price,2)
+    discount=np.round(rng.choice([0,0,0,5,10,15,20],n_orders),2)
+    shipping=rng.choice([0,4.9,6.9],n_orders)
+    net=np.round(gross-discount+shipping,2)
+    orders=pd.DataFrame({
+        "order_id":np.arange(500001,500001+n_orders),
+        "order_date":dates,
+        "customer_id":rng.choice(ids,n_orders),
+        "product_id":rng.choice(pids,n_orders),
+        "quantity":qty,
+        "gross_amount_chf":gross,
+        "promo_code":rng.choice(["","SAVE10","WELCOME","SPRING"],n_orders),
+        "discount_chf":discount,
+        "shipping_chf":shipping,
+        "net_amount_chf":net,
+        "payment_method":rng.choice(["card","paypal","twint"],n_orders),
+        "status":rng.choice(["completed","completed","completed","cancelled"],n_orders),
+        "shipping_city":rng.choice(["Zurich","Bern","Basel","Lucerne","Geneva"],n_orders),
+        "channel":rng.choice(["web","mobile","marketplace"],n_orders)
+    })
+    campaigns=pd.DataFrame({
+        "campaign_id":range(1,7),
+        "campaign_name":[f"Campaign {i}" for i in range(1,7)],
+        "start_date":pd.date_range("2025-01-01",periods=6,freq="60D"),
+        "end_date":pd.date_range("2025-02-15",periods=6,freq="60D"),
+        "channel":["email","social","paid","email","social","paid"],
+        "target_segment":["Standard","Premium","VIP","Standard","Premium","VIP"]
+    })
+    return customers, products, orders, campaigns
 
-        self.level_index = 0
-        self.xp = 0
-        self.completed_levels = []
-        self.running = False
-
-        self.load_progress()
-        self.build_ui()
-        self.update_level_view()
-
-    # --------------------------------------------------------
-    # Speicherung
-    # --------------------------------------------------------
-    def load_progress(self):
-        if SAVE_FILE.exists():
-            try:
-                data = json.loads(SAVE_FILE.read_text(encoding="utf-8"))
-                self.xp = int(data.get("xp", 0))
-                self.completed_levels = list(data.get("completed_levels", []))
-                last_level = int(data.get("current_level", 1))
-                self.level_index = max(0, min(last_level - 1, len(LEVELS) - 1))
-            except (ValueError, TypeError, json.JSONDecodeError):
-                self.xp = 0
-                self.completed_levels = []
-                self.level_index = 0
-
-    def save_progress(self):
-        data = {
-            "xp": self.xp,
-            "completed_levels": self.completed_levels,
-            "current_level": self.current_level["id"],
-        }
-        SAVE_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
-
-    # --------------------------------------------------------
-    # Oberfläche
-    # --------------------------------------------------------
-    def build_ui(self):
-        self.root.columnconfigure(0, weight=1)
-        self.root.rowconfigure(1, weight=1)
-
-        header = ttk.Frame(self.root, padding=12)
-        header.grid(row=0, column=0, sticky="ew")
-        header.columnconfigure(1, weight=1)
-
-        ttk.Label(
-            header,
-            text="DATAFLOW ANALYST",
-            font=("Arial", 22, "bold"),
-        ).grid(row=0, column=0, sticky="w")
-
-        self.status_label = ttk.Label(header, text="")
-        self.status_label.grid(row=0, column=1, sticky="e")
-
-        main = ttk.Frame(self.root, padding=(12, 0, 12, 12))
-        main.grid(row=1, column=0, sticky="nsew")
-        main.columnconfigure(0, weight=0)
-        main.columnconfigure(1, weight=1)
-        main.rowconfigure(0, weight=1)
-
-        # Linke Seite: Aufgabe
-        task_frame = ttk.LabelFrame(main, text="Aufgabe", padding=12)
-        task_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
-        task_frame.configure(width=330)
-
-        self.level_label = ttk.Label(task_frame, text="", font=("Arial", 16, "bold"))
-        self.level_label.pack(anchor="w", pady=(0, 10))
-
-        self.task_title = ttk.Label(task_frame, text="", font=("Arial", 13, "bold"), wraplength=290)
-        self.task_title.pack(anchor="w", pady=(0, 10))
-
-        self.task_description = tk.Text(task_frame, height=10, width=34, wrap="word", relief="flat")
-        self.task_description.pack(fill="both", expand=True)
-        self.task_description.configure(state="disabled")
-
-        self.hint_button = ttk.Button(task_frame, text="Hinweis anzeigen", command=self.show_hint)
-        self.hint_button.pack(fill="x", pady=(10, 5))
-
-        # Rechte Seite: Editor + Output
-        right = ttk.Frame(main)
-        right.grid(row=0, column=1, sticky="nsew")
-        right.rowconfigure(1, weight=1)
-        right.rowconfigure(4, weight=0)
-        right.columnconfigure(0, weight=1)
-
-        ttk.Label(right, text="Python Editor", font=("Arial", 13, "bold")).grid(
-            row=0, column=0, sticky="w", pady=(0, 5)
-        )
-
-        editor_frame = ttk.Frame(right)
-        editor_frame.grid(row=1, column=0, sticky="nsew")
-        editor_frame.rowconfigure(0, weight=1)
-        editor_frame.columnconfigure(0, weight=1)
-
-        self.editor = tk.Text(
-            editor_frame,
-            font=("Consolas", 12),
-            undo=True,
-            wrap="none",
-        )
-        self.editor.grid(row=0, column=0, sticky="nsew")
-
-        editor_scroll = ttk.Scrollbar(editor_frame, orient="vertical", command=self.editor.yview)
-        editor_scroll.grid(row=0, column=1, sticky="ns")
-        self.editor.configure(yscrollcommand=editor_scroll.set)
-
-        controls = ttk.Frame(right)
-        controls.grid(row=2, column=0, sticky="ew", pady=10)
-        controls.columnconfigure(0, weight=1)
-
-        self.run_button = ttk.Button(controls, text="▶ CODE AUSFÜHREN", command=self.run_code)
-        self.run_button.grid(row=0, column=0, sticky="w")
-
-        self.reset_button = ttk.Button(controls, text="Code zurücksetzen", command=self.reset_code)
-        self.reset_button.grid(row=0, column=1, padx=(8, 0))
-
-        self.next_button = ttk.Button(controls, text="Nächstes Level ▶", command=self.next_level)
-        self.next_button.grid(row=0, column=2, padx=(8, 0))
-        self.next_button.state(["disabled"])
-
-        ttk.Label(right, text="Output", font=("Arial", 13, "bold")).grid(
-            row=3, column=0, sticky="w", pady=(5, 5)
-        )
-
-        self.output = tk.Text(
-            right,
-            height=10,
-            font=("Consolas", 11),
-            wrap="word",
-        )
-        self.output.grid(row=4, column=0, sticky="ew")
-        self.output.configure(state="disabled")
-
-        self.progress = ttk.Progressbar(right, mode="determinate", maximum=len(LEVELS))
-        self.progress.grid(row=5, column=0, sticky="ew", pady=(10, 0))
-
-    # --------------------------------------------------------
-    # Level-Logik
-    # --------------------------------------------------------
-    @property
-    def current_level(self):
-        return LEVELS[self.level_index]
-
-    def update_level_view(self):
-        level = self.current_level
-        self.level_label.configure(text=f"LEVEL {level['id']} / {len(LEVELS)}")
-        self.task_title.configure(text=level["title"])
-
-        self.task_description.configure(state="normal")
-        self.task_description.delete("1.0", tk.END)
-        self.task_description.insert("1.0", level["description"])
-        self.task_description.configure(state="disabled")
-
-        self.editor.delete("1.0", tk.END)
-        self.editor.insert("1.0", level["starter"])
-
-        self.clear_output()
-        self.next_button.state(["disabled"])
-        self.run_button.state(["!disabled"])
-        self.status_label.configure(text=f"XP: {self.xp}")
-        self.progress["value"] = len(self.completed_levels)
-
-    def reset_code(self):
-        self.editor.delete("1.0", tk.END)
-        self.editor.insert("1.0", self.current_level["starter"])
-        self.clear_output()
-
-    def show_hint(self):
-        messagebox.showinfo("Hinweis", self.current_level["hint"])
-
-    def next_level(self):
-        if self.level_index >= len(LEVELS) - 1:
-            messagebox.showinfo(
-                "Prototyp abgeschlossen",
-                "Du hast alle drei Prototyp-Level abgeschlossen.\n\n"
-                "Als Nächstes können wir weitere Data-Wrangling-Level hinzufügen.",
-            )
-            return
-
-        self.level_index += 1
-        self.save_progress()
-        self.update_level_view()
-
-    # --------------------------------------------------------
-    # Code-Ausführung
-    # --------------------------------------------------------
-    def run_code(self):
-        if self.running:
-            return
-
-        code = self.editor.get("1.0", tk.END).strip()
-        if not code:
-            self.show_result("❌ Bitte schreibe zuerst Python-Code in den Editor.")
-            return
-
-        if not DATA_FILE.exists():
-            self.show_result(
-                "❌ Die Datei data/orders.xlsx wurde nicht gefunden.\n\n"
-                f"Gesucht wurde hier:\n{DATA_FILE}"
-            )
-            return
-
-        self.running = True
-        self.run_button.state(["disabled"])
-        self.clear_output()
-        self.show_result("Code wird ausgeführt ...\n")
-
-        thread = threading.Thread(target=self.execute_code_in_process, args=(code,), daemon=True)
-        thread.start()
-
-    def execute_code_in_process(self, code: str):
-        temp_path = None
-        try:
-            with tempfile.NamedTemporaryFile(
-                mode="w",
-                suffix=".py",
-                delete=False,
-                encoding="utf-8",
-            ) as temp_file:
-                temp_path = temp_file.name
-                temp_file.write(code)
-
-            result = subprocess.run(
-                [sys.executable, temp_path],
-                cwd=BASE_DIR,
-                capture_output=True,
-                text=True,
-                timeout=8,
-            )
-
-            stdout = result.stdout
-            stderr = result.stderr
-
-            self.root.after(0, lambda: self.handle_execution_result(stdout, stderr, result.returncode))
-
-        except subprocess.TimeoutExpired:
-            self.root.after(
-                0,
-                lambda: self.handle_execution_result(
-                    "",
-                    "Zeitüberschreitung: Dein Programm lief länger als 8 Sekunden.",
-                    1,
-                ),
-            )
-        except Exception as exc:
-            self.root.after(
-                0,
-                lambda: self.handle_execution_result("", f"Interner Fehler: {exc}", 1),
-            )
-        finally:
-            if temp_path:
-                try:
-                    os.remove(temp_path)
-                except OSError:
-                    pass
-
-    def handle_execution_result(self, stdout: str, stderr: str, returncode: int):
-        self.running = False
-        self.run_button.state(["!disabled"])
-
-        combined = stdout
-        if stderr:
-            combined += ("\n" if combined else "") + stderr
-
-        if returncode != 0:
-            self.show_result("❌ FEHLER\n\n" + combined)
-            return
-
-        self.show_result(combined if combined.strip() else "(Keine Ausgabe)")
-
-        try:
-            solved = self.current_level["check"](stdout)
-        except Exception:
-            solved = False
-
-        if solved:
-            self.handle_success()
+def prepare_base_data(target_dir):
+    import pandas as pd
+    (target_dir/"data").mkdir(parents=True, exist_ok=True)
+    wb=find_workbook()
+    try:
+        if wb:
+            kunden=pd.read_excel(wb, sheet_name="Kunden")
+            produkte=pd.read_excel(wb, sheet_name="Produkte")
+            bestellungen=pd.read_excel(wb, sheet_name="Bestellungen")
+            kampagnen=pd.read_excel(wb, sheet_name="Kampagnen")
         else:
-            self.show_result(
-                (combined if combined.strip() else "(Keine Ausgabe)")
-                + "\n\n❌ Aufgabe noch nicht korrekt gelöst."
-            )
+            raise RuntimeError
+    except Exception:
+        kunden, produkte, bestellungen, kampagnen=_synthetic_shop_data()
 
-    def handle_success(self):
-        level_id = self.current_level["id"]
-        if level_id not in self.completed_levels:
-            self.completed_levels.append(level_id)
-            self.xp += self.current_level["xp"]
-            self.save_progress()
+    transactions=pd.DataFrame({
+        "Customer":bestellungen["customer_id"],
+        "TransDate":pd.to_datetime(bestellungen["order_date"], errors="coerce"),
+        "Quantity":pd.to_numeric(bestellungen["quantity"], errors="coerce"),
+        "PurchAmount":pd.to_numeric(bestellungen["net_amount_chf"], errors="coerce"),
+        "Cost":pd.to_numeric(bestellungen["discount_chf"], errors="coerce").fillna(0)
+              +pd.to_numeric(bestellungen["shipping_chf"], errors="coerce").fillna(0),
+        "Channel":bestellungen.get("channel", pd.Series(["online"]*len(bestellungen))).astype(str)
+    })
+    transactions["Year"]=transactions["TransDate"].dt.year
+    cust=pd.DataFrame({
+        "Customer":kunden["customer_id"],
+        "CustId":kunden["customer_id"],
+        "Store":kunden.get("acquisition_channel", pd.Series(["online"]*len(kunden))).astype(str),
+        "JoinDate":pd.to_datetime(kunden.get("registration_date"), errors="coerce")
+    })
 
-        self.status_label.configure(text=f"XP: {self.xp}")
-        self.progress["value"] = len(self.completed_levels)
-        self.next_button.state(["!disabled"])
+    A=pd.DataFrame({
+        "ID":[1,2,3,4],
+        "TransDate":pd.to_datetime(["2025-01-01","2025-01-02","2025-01-03","2025-01-04"]),
+        "ValueA":[10,20,30,40]
+    })
+    B=pd.DataFrame({
+        "ID":[2,3,4,5],
+        "TransDate":pd.to_datetime(["2025-01-02","2025-01-03","2025-01-04","2025-01-05"]),
+        "ValueB":[200,300,400,500]
+    })
 
-        self.show_result(
-            "✅ AUFGABE GELÖST!\n\n"
-            f"+{self.current_level['xp']} XP\n"
-            f"Gesamt-XP: {self.xp}"
-        )
+    transactions.to_csv(target_dir/"data"/"transactions.csv", index=False)
+    transactions.to_csv(target_dir/"transactions.csv", index=False)
+    kunden.to_csv(target_dir/"customers.csv", index=False)
+    produkte.to_csv(target_dir/"products.csv", index=False)
 
-    # --------------------------------------------------------
-    # Output
-    # --------------------------------------------------------
-    def clear_output(self):
-        self.output.configure(state="normal")
-        self.output.delete("1.0", tk.END)
-        self.output.configure(state="disabled")
+    import sqlite3
+    con=sqlite3.connect(target_dir/"database.sqlite")
+    transactions.to_sql("transactions", con, if_exists="replace", index=False)
+    cust.to_sql("CustData", con, if_exists="replace", index=False)
+    A.to_sql("A", con, if_exists="replace", index=False)
+    B.to_sql("B", con, if_exists="replace", index=False)
+    A.to_sql("X", con, if_exists="replace", index=False)
+    B.to_sql("Y", con, if_exists="replace", index=False)
+    pd.DataFrame({"ID":[1],"Value":["demo"]}).to_sql("new_table", con, if_exists="replace", index=False)
+    con.commit()
+    con.close()
 
-    def show_result(self, text: str):
-        self.output.configure(state="normal")
-        self.output.delete("1.0", tk.END)
-        self.output.insert("1.0", text)
-        self.output.configure(state="disabled")
+def adapt_code(code):
+    c=code
+    c=c.replace("filepath_or_buüer", '"data/transactions.csv"')
+    c=c.replace("filepath_or_buffer", '"data/transactions.csv"')
+    c=c.replace('path_or_buf="file.csv"', '"output.csv"')
+    c=c.replace("path_or_buf='file.csv'", '"output.csv"')
+    c=c.replace("package.function", "np.sum")
+    c=c.replace('myData["Spalte1"]', 'myData["PurchAmount"]')
+    c=c.replace('myData["Spalte2"]', 'myData["Cost"]')
+    c=c.replace('myData["Spalte"]', 'myData["PurchAmount"]')
+    c=c.replace('myData["column_name"]', 'myData["Customer"]')
+    c=c.replace("row_index", "0")
+    c=c.replace("dayﬁrst", "dayfirst")
+    c=c.replace("zﬁll", "zfill")
+    # Current pandas: DataFrame.append() was removed. The game uses concat only in the old append example.
+    c=c.replace(
+        'myData.append(pd.DataFrame([[...]], columns=myData.columns.values), ignore_index=True)',
+        'myData = pd.concat([myData, pd.DataFrame([[1001, pd.Timestamp("2025-01-01"), 1, 10.0, 2.0, "web", 2025]], columns=myData.columns)], ignore_index=True)'
+    )
+    c=c.replace("variableName = (...)", "variableName = 42")
+    # Placeholder expressions in plotting examples.
+    c=re.sub(r'plt\.plot\(x,\s*y,', 'plt.plot(myData["PurchAmount"].head(20), myData["Cost"].head(20),', c)
+    c=re.sub(r'plt\.text\(x,\s*y,', 'plt.text(100, 50,', c)
+    c=c.replace("plt.xlim(min, max)", "plt.xlim(0,500)")
+    c=c.replace("plt.ylim(min, max)", "plt.ylim(0,500)")
+    stripped=c.strip()
+    if stripped.startswith(("SELECT ","INSERT INTO ","ALTER TABLE ","DROP TABLE ")):
+        if stripped.startswith("SELECT "):
+            return "query=" + repr(stripped) + "\nresult=pd.read_sql_query(query, con)\nprint(result.to_string(index=False))"
+        return "cursor.execute(" + repr(stripped) + ")\ncon.commit()\nprint('OK')"
+    return c
 
+def runner_prelude():
+    return r"""
+import os, sys, json, sqlite3, datetime, string, itertools, types
+import numpy as np
+import pandas as pd
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+try:
+    import seaborn as sns
+    if not hasattr(sns, "distplot"):
+        def _distplot(x, kde=False, vertical=False, **kwargs):
+            return sns.histplot(y=x, kde=kde) if vertical else sns.histplot(x=x, kde=kde)
+        sns.distplot=_distplot
+except Exception:
+    class _SNS:
+        def _one(self,*args,**kwargs): return plt.gca()
+        distplot=_one; lmplot=_one; regplot=_one; jointplot=_one
+        boxplot=_one; barplot=_one; stripplot=_one; pointplot=_one
+        def set_palette(self,*args,**kwargs): pass
+        def set_style(self,*args,**kwargs): pass
+        def axes_style(self,*args,**kwargs): return {}
+        class FacetGrid:
+            def __init__(self,*args,**kwargs): pass
+            def map(self,*args,**kwargs): return self
+            def add_legend(self): return self
+    sns=_SNS()
+
+_names=types.ModuleType("names")
+_first=["Anna","Luca","Julia","Max","Sophie","Noah","Laura","Leon","Mia","Jonas"]
+_last=["Meier","Müller","Weber","Schmid","Keller","Rossi","Fischer","Huber"]
+import random
+_names.get_first_name=lambda gender=None: random.choice(_first)
+_names.get_last_name=lambda: random.choice(_last)
+_names.get_full_name=lambda gender=None: random.choice(_first)+" "+random.choice(_last)
+sys.modules["names"]=_names
+
+transactions=pd.read_csv("data/transactions.csv")
+transactions["TransDate"]=pd.to_datetime(transactions["TransDate"], errors="coerce")
+transactions["Year"]=transactions["TransDate"].dt.year
+myData=transactions.copy()
+df=myData.copy()
+CustData=pd.read_csv("customers.csv")
+if "customer_id" in CustData.columns:
+    CustData=pd.DataFrame({
+        "Customer":CustData["customer_id"],
+        "CustId":CustData["customer_id"],
+        "Store":CustData.get("acquisition_channel",pd.Series(["online"]*len(CustData))).astype(str),
+        "JoinDate":pd.to_datetime(CustData.get("registration_date"), errors="coerce")
+    })
+A=pd.DataFrame({"ID":[1,2,3,4],"TransDate":pd.to_datetime(["2025-01-01","2025-01-02","2025-01-03","2025-01-04"]),"ValueA":[10,20,30,40]})
+B=pd.DataFrame({"ID":[2,3,4,5],"TransDate":pd.to_datetime(["2025-01-02","2025-01-03","2025-01-04","2025-01-05"]),"ValueB":[200,300,400,500]})
+X=A.copy()
+Y=B.copy()
+con=sqlite3.connect("database.sqlite")
+cursor=con.cursor()
+DataFrame=pd.DataFrame
+"""
+
+
+def ensure_runtime_data():
+    """Erzeugt die gemeinsame Basis einmal; jeder Code-Lauf bekommt daraus eine frische Kopie."""
+    marker = GAME_RUNTIME_DIR / "database.sqlite"
+    if marker.exists() and (GAME_RUNTIME_DIR / "data" / "transactions.csv").exists():
+        return
+    GAME_RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+    prepare_base_data(GAME_RUNTIME_DIR)
+
+def run_code(code):
+    with tempfile.TemporaryDirectory(prefix="dataflow_runner_") as td:
+        work=Path(td)
+        ensure_runtime_data()
+        shutil.copytree(GAME_RUNTIME_DIR, work, dirs_exist_ok=True)
+        adapted=adapt_code(code)
+        script=work/"player_code.py"
+        script.write_text(runner_prelude()+"\n# --- SPIELERCODE ---\n"+adapted+"\ntry:\n con.commit(); con.close()\nexcept Exception:\n pass\n", encoding="utf-8")
+        try:
+            p=subprocess.run([sys.executable,str(script)],cwd=str(work),
+                             capture_output=True,text=True,timeout=RUN_TIMEOUT)
+            return {"ok":p.returncode==0,"stdout":p.stdout,"stderr":p.stderr,
+                    "plots":[str(x.relative_to(work)) for x in work.rglob("*.png")],
+                    "files":[str(x.relative_to(work)) for x in work.rglob("*.csv") if x.name!="transactions.csv"]}
+        except subprocess.TimeoutExpired as e:
+            return {"ok":False,"stdout":e.stdout or "","stderr":"Zeitüberschreitung – maximal "+str(RUN_TIMEOUT)+" Sekunden.","plots":[],"files":[]}
+
+def normalize(s):
+    return re.sub(r"\s+"," ",str(s).strip().lower())
+
+def parse_number(s):
+    s=str(s).strip().replace(",",".")
+    if re.fullmatch(r"-?\d+(?:\.\d+)?",s):
+        try: return float(s)
+        except Exception: return None
+    return None
+
+def get_reference(level):
+    code=level["pdf_code"]
+    if any(x in code for x in ["pip uninstall","conda remove","DROP TABLE"]):
+        return None
+    result=run_code(code)
+    if not result["ok"]:
+        return None
+    lines=[x.strip() for x in result["stdout"].splitlines() if x.strip()]
+    if not lines: return None
+    last=lines[-1]
+    if len(last)<=120 and not any(x in last for x in ["<class","dtype:","Name:"]):
+        return last
+    return None
+
+class GameState:
+    def __init__(self):
+        self.xp=0
+        self.completed=[]
+        self.current=0
+        self.load()
+    def load(self):
+        try:
+            if SAVE_FILE.exists():
+                d=json.loads(SAVE_FILE.read_text(encoding="utf-8"))
+                self.xp=int(d.get("xp",0))
+                self.completed=list(d.get("completed",[]))
+                self.current=int(d.get("current",0))
+        except Exception:
+            pass
+    def save(self):
+        SAVE_FILE.parent.mkdir(parents=True,exist_ok=True)
+        SAVE_FILE.write_text(json.dumps({"xp":self.xp,"completed":self.completed,"current":self.current},ensure_ascii=False,indent=2),encoding="utf-8")
+    def complete(self,i):
+        if i not in self.completed:
+            self.completed.append(i)
+            self.xp+=100
+            self.save()
+            return True
+        return False
+
+class DataFlowGame(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title(APP_TITLE)
+        self.geometry("1500x900")
+        self.minsize(1100,720)
+        self.gs=GameState()
+        self.current=max(0,min(self.gs.current,len(LEVELS)-1))
+        self.last_run=None
+        self.ref_cache={}
+        self._style()
+        self._ui()
+        self.load_level(self.current)
+    def _style(self):
+        s=ttk.Style(self)
+        try: s.theme_use("clam")
+        except Exception: pass
+        s.configure("Title.TLabel",font=("Arial",22,"bold"))
+        s.configure("Level.TLabel",font=("Arial",15,"bold"))
+        s.configure("Action.TButton",font=("Arial",11,"bold"),padding=8)
+    def _ui(self):
+        header=ttk.Frame(self,padding=12); header.pack(fill="x")
+        ttk.Label(header,text=APP_TITLE,style="Title.TLabel").pack(side="left")
+        self.xp_label=ttk.Label(header,text="XP: 0",style="Level.TLabel"); self.xp_label.pack(side="right")
+        self.progress_label=ttk.Label(header,text="",style="Level.TLabel"); self.progress_label.pack(side="right",padx=20)
+        pane=ttk.Panedwindow(self,orient="horizontal"); pane.pack(fill="both",expand=True,padx=12,pady=(0,12))
+        left=ttk.Frame(pane,padding=8); pane.add(left,weight=1)
+        ttk.Label(left,text="LEVELS",style="Level.TLabel").pack(anchor="w",pady=(0,8))
+        self.level_list=tk.Listbox(left,width=38,font=("Consolas",9),activestyle="dotbox"); self.level_list.pack(fill="both",expand=True)
+        self.level_list.bind("<Double-Button-1>",self._select_level)
+        center=ttk.Frame(pane,padding=8); pane.add(center,weight=5)
+        self.level_title=ttk.Label(center,text="",style="Level.TLabel"); self.level_title.pack(anchor="w")
+        self.source_label=ttk.Label(center,text=""); self.source_label.pack(anchor="w",pady=(0,6))
+        lf=ttk.LabelFrame(center,text="AUFGABE",padding=8); lf.pack(fill="x",pady=(0,8))
+        self.task=tk.Text(lf,height=7,wrap="word",font=("Arial",11)); self.task.pack(fill="x"); self.task.configure(state="disabled")
+        ef=ttk.LabelFrame(center,text="PYTHON-EDITOR – freie Lösung",padding=8); ef.pack(fill="both",expand=True)
+        self.editor=tk.Text(ef,wrap="none",undo=True,font=("Consolas",11)); self.editor.pack(fill="both",expand=True)
+        br=ttk.Frame(center); br.pack(fill="x",pady=8)
+        ttk.Button(br,text="▶ CODE AUSFÜHREN",style="Action.TButton",command=self.run_player).pack(side="left")
+        ttk.Button(br,text="PDF-CODE",command=self.show_pdf).pack(side="left",padx=6)
+        ttk.Button(br,text="HINWEIS",command=self.show_hint).pack(side="left")
+        ttk.Button(br,text="◀ VORHERIGES",command=lambda:self.load_level(self.current-1)).pack(side="right")
+        ttk.Button(br,text="NÄCHSTES ▶",command=lambda:self.load_level(self.current+1)).pack(side="right",padx=6)
+        right=ttk.Frame(pane,padding=8); pane.add(right,weight=3)
+        of=ttk.LabelFrame(right,text="PYTHON-OUTPUT",padding=8); of.pack(fill="both",expand=True)
+        self.output=tk.Text(of,wrap="word",font=("Consolas",10)); self.output.pack(fill="both",expand=True)
+        af=ttk.LabelFrame(right,text="DEINE ANTWORT",padding=8); af.pack(fill="x",pady=(8,0))
+        ttk.Label(af,text="Ergebnis / Antwort separat eingeben:").pack(anchor="w")
+        self.answer=ttk.Entry(af,font=("Arial",12)); self.answer.pack(fill="x",pady=5)
+        ttk.Button(af,text="✅ ANTWORT PRÜFEN",style="Action.TButton",command=self.check_answer).pack(fill="x")
+        ttk.Button(af,text="REFERENZ / LÖSUNG",command=self.show_reference).pack(fill="x",pady=(5,0))
+        self.status=ttk.Label(self,text="Bereit.",relief="sunken",anchor="w",padding=5); self.status.pack(fill="x",side="bottom")
+    def refresh_level_list(self):
+        self.level_list.delete(0,tk.END)
+        for i,lv in enumerate(LEVELS):
+            mark="✅" if i in self.gs.completed else "⬜"
+            self.level_list.insert(tk.END,f"{mark} {i+1:03d}  {lv['title'][:46]}")
+        if LEVELS:
+            self.level_list.selection_clear(0,tk.END); self.level_list.selection_set(self.current); self.level_list.see(self.current)
+        self.xp_label.config(text=f"XP: {self.gs.xp}")
+        self.progress_label.config(text=f"{len(self.gs.completed)}/{len(LEVELS)} Levels")
+    def load_level(self,index):
+        if not LEVELS: return
+        self.current=max(0,min(index,len(LEVELS)-1)); self.gs.current=self.current; self.gs.save()
+        lv=LEVELS[self.current]
+        self.level_title.config(text=f"Level {self.current+1:03d} – {lv['title']}")
+        self.source_label.config(text=f"Quelle: Codes_python_data_analytics.pdf · Seite {lv.get('page','?')}")
+        self.task.configure(state="normal"); self.task.delete("1.0",tk.END); self.task.insert("1.0",lv["task"]); self.task.configure(state="disabled")
+        self.editor.delete("1.0",tk.END)
+        self.editor.insert("1.0","# Schreibe hier deine eigene Lösung.\n# Du darfst zuerst frei untersuchen: df.head(), df.info(), df.dtypes, df.columns ...\n# PDF-CODE zeigt das Originalbeispiel; es ist nicht deine einzige mögliche Lösung.\n\n")
+        self.output.delete("1.0",tk.END); self.output.insert("1.0","Noch kein Code ausgeführt.\n")
+        self.answer.delete(0,tk.END); self.last_run=None; self.refresh_level_list()
+        self.status.config(text="Level geladen – freie Lösungswege sind erlaubt.")
+    def _select_level(self,_=None):
+        sel=self.level_list.curselection()
+        if sel: self.load_level(sel[0])
+    def run_player(self):
+        code=self.editor.get("1.0",tk.END)
+        if not code.strip(): return
+        self.status.config(text="Code wird ausgeführt ..."); self.update_idletasks()
+        self.last_run=run_code(code)
+        self.output.delete("1.0",tk.END)
+        if self.last_run["ok"]:
+            self.output.insert("1.0",self.last_run["stdout"] or "(keine Ausgabe)")
+            self.output.insert(tk.END,"\n\n✅ Code erfolgreich ausgeführt.")
+            if self.last_run["plots"]: self.output.insert(tk.END,"\n📊 Plot-Artefakt(e): "+", ".join(self.last_run["plots"]))
+            if self.last_run["files"]: self.output.insert(tk.END,"\n📁 Datei(en): "+", ".join(self.last_run["files"]))
+            self.status.config(text="Code erfolgreich. Jetzt Antwort separat prüfen.")
+        else:
+            self.output.insert("1.0","❌ FEHLER\n\n"+(self.last_run.get("stdout") or "")+"\n"+(self.last_run.get("stderr") or ""))
+            self.status.config(text="Code fehlgeschlagen – Fehler analysieren und erneut versuchen.")
+    def show_pdf(self):
+        lv=LEVELS[self.current]
+        w=tk.Toplevel(self); w.title("PDF-Code / Level"); w.geometry("1000x700")
+        ttk.Label(w,text=f"Original-Code aus dem PDF · Seite {lv.get('page','?')}",style="Level.TLabel").pack(anchor="w",padx=12,pady=10)
+        txt=tk.Text(w,wrap="none",font=("Consolas",10)); txt.pack(fill="both",expand=True,padx=12,pady=(0,12))
+        txt.insert("1.0",lv["pdf_code"]); txt.configure(state="disabled")
+    def show_hint(self):
+        code=LEVELS[self.current]["pdf_code"]
+        if "groupby" in code: h="Denke an Gruppieren und danach an eine Aggregation."
+        elif "merge" in code or "JOIN" in code: h="Achte auf gemeinsame Schlüssel/IDs und den Join-Typ."
+        elif "plt." in code or "sns." in code: h="Erzeuge die Grafik aus den Daten. Ein Plot darf beliebig aufgebaut werden."
+        elif "SELECT " in code or "sqlite3" in code: h="Die Datenbank läuft lokal über SQLite. Nutze sqlite3, cursor.execute() oder pd.read_sql_query()."
+        elif "def " in code: h="Definiere die Funktion, berechne das Ergebnis und gib es mit return zurück."
+        elif "np.random" in code: h="Achte auf size, replace, loc, scale und seed."
+        else: h="Untersuche zuerst die Daten mit df.head(), df.info(), df.dtypes oder df.columns."
+        messagebox.showinfo("Hinweis",h)
+    def expected(self):
+        if self.current not in self.ref_cache: self.ref_cache[self.current]=get_reference(LEVELS[self.current])
+        return self.ref_cache[self.current]
+    def check_answer(self):
+        ans=self.answer.get().strip()
+        if not ans:
+            messagebox.showwarning("Antwort fehlt","Bitte trage zuerst deine Antwort ein."); return
+        if not self.last_run or not self.last_run["ok"]:
+            messagebox.showwarning("Code zuerst ausführen","Führe deinen Code zuerst erfolgreich aus."); return
+        exp=self.expected()
+        code=LEVELS[self.current]["pdf_code"]
+        action=(("plt." in code or "sns." in code) or ("to_csv" in code or "savefig" in code)
+                or code.strip().startswith("#") or code.strip().startswith("help("))
+        if exp is not None:
+            a=parse_number(ans); b=parse_number(exp)
+            correct=(abs(a-b)<1e-9) if a is not None and b is not None else (normalize(ans)==normalize(exp))
+        elif action:
+            correct=True
+        else:
+            correct=True
+        if correct:
+            new=self.gs.complete(self.current); self.refresh_level_list()
+            msg="✅ LEVEL GESCHAFFT\n\n"
+            msg += (f"Referenzantwort: {exp}\n" if exp is not None else "Erfolgreiche Ausführung / offene Analyse bestätigt.\n")
+            if new: msg += "\n+100 XP"
+            messagebox.showinfo("Erfolg",msg); self.status.config(text="Level gelöst.")
+        else:
+            messagebox.showerror("Noch nicht richtig","Die Antwort stimmt noch nicht mit der Referenz überein.")
+    def show_reference(self):
+        lv=LEVELS[self.current]; exp=self.expected()
+        w=tk.Toplevel(self); w.title("Referenz / Lösung"); w.geometry("1000x750")
+        txt=tk.Text(w,wrap="word",font=("Consolas",10)); txt.pack(fill="both",expand=True,padx=12,pady=12)
+        txt.insert("1.0",f"LEVEL {self.current+1:03d}\n{lv['title']}\n\nAufgabe:\n{lv['task']}\n\n")
+        if exp is not None: txt.insert(tk.END,"Automatisch ermittelte Referenzantwort:\n"+exp+"\n\n")
+        else: txt.insert(tk.END,"Keine kurze eindeutige Referenzantwort automatisch erkannt.\nFür diesen Level ist die erfolgreiche Ausführung / eigene Analyse wichtig.\n\n")
+        txt.insert(tk.END,"Original-Code aus dem PDF:\n"+lv["pdf_code"]); txt.configure(state="disabled")
 
 def main():
-    root = tk.Tk()
-    app = DataFlowGame(root)
-    root.mainloop()
+    SAVE_FILE.parent.mkdir(parents=True,exist_ok=True)
+    try:
+        ensure_runtime_data()
+    except Exception:
+        pass
+    app=DataFlowGame()
+    app.mainloop()
 
-
-if __name__ == "__main__":
+if __name__=="__main__":
     main()
