@@ -1,0 +1,437 @@
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import threading
+import tkinter as tk
+from pathlib import Path
+from tkinter import messagebox, ttk
+
+
+# ============================================================
+# DataFlow Analyst - erster spielbarer Prototyp
+# ============================================================
+# Voraussetzungen:
+#   - Python 3
+#   - pandas
+#   - openpyxl
+#   - Excel-Datei unter data/orders.xlsx
+#
+# Start:
+#   python main.py
+# ============================================================
+
+BASE_DIR = Path(__file__).resolve().parent
+DATA_DIR = BASE_DIR / "data"
+SAVE_DIR = BASE_DIR / "save"
+DATA_FILE = DATA_DIR / "orders.xlsx"
+SAVE_FILE = SAVE_DIR / "progress.json"
+
+DATA_DIR.mkdir(exist_ok=True)
+SAVE_DIR.mkdir(exist_ok=True)
+
+
+LEVELS = [
+    {
+        "id": 1,
+        "title": "Der erste Datensatz",
+        "description": (
+            "Lade die Datei orders.xlsx mit pandas und gib die Anzahl "
+            "der Bestellungen aus."
+        ),
+        "hint": "Hinweis: Verwende pd.read_excel(...) und danach len(df) oder df.shape[0].",
+        "xp": 100,
+        "check": lambda output: output.strip().splitlines()[-1].strip() == "650"
+        if output.strip()
+        else False,
+        "starter": (
+            "import pandas as pd\n\n"
+            "df = pd.read_excel('data/orders.xlsx', sheet_name='Bestellungen')\n\n"
+            "# Gib hier die Anzahl der Bestellungen aus.\n"
+        ),
+    },
+    {
+        "id": 2,
+        "title": "Was steckt in der Tabelle?",
+        "description": (
+            "Lade das Tabellenblatt Bestellungen und gib die Spaltennamen aus. "
+            "Alle 14 Spalten müssen in deiner Ausgabe vorkommen."
+        ),
+        "hint": "Hinweis: df.columns oder df.columns.tolist() hilft dir dabei.",
+        "xp": 150,
+        "required_tokens": [
+            "order_id",
+            "order_date",
+            "customer_id",
+            "product_id",
+            "quantity",
+            "gross_amount_chf",
+            "promo_code",
+            "discount_chf",
+            "shipping_chf",
+            "net_amount_chf",
+            "payment_method",
+            "status",
+            "shipping_city",
+            "channel",
+        ],
+        "check": lambda output: all(
+            token in output for token in LEVELS[1]["required_tokens"]
+        ),
+        "starter": (
+            "import pandas as pd\n\n"
+            "df = pd.read_excel('data/orders.xlsx', sheet_name='Bestellungen')\n\n"
+            "# Gib hier die Spaltennamen aus.\n"
+        ),
+    },
+    {
+        "id": 3,
+        "title": "Die grossen Bestellungen",
+        "description": (
+            "Finde heraus, wie viele Bestellungen mehr als 3 Produkte enthalten. "
+            "Gib nur die Anzahl aus."
+        ),
+        "hint": "Hinweis: Filtere mit df[df['quantity'] > 3] und zähle danach die Zeilen.",
+        "xp": 200,
+        "check": lambda output: output.strip().splitlines()[-1].strip() == "27"
+        if output.strip()
+        else False,
+        "starter": (
+            "import pandas as pd\n\n"
+            "df = pd.read_excel('data/orders.xlsx', sheet_name='Bestellungen')\n\n"
+            "# Filtere die Bestellungen und gib die Anzahl aus.\n"
+        ),
+    },
+]
+
+
+class DataFlowGame:
+    def __init__(self, root: tk.Tk):
+        self.root = root
+        self.root.title("DataFlow Analyst")
+        self.root.geometry("1250x800")
+        self.root.minsize(1050, 700)
+
+        self.level_index = 0
+        self.xp = 0
+        self.completed_levels = []
+        self.running = False
+
+        self.load_progress()
+        self.build_ui()
+        self.update_level_view()
+
+    # --------------------------------------------------------
+    # Speicherung
+    # --------------------------------------------------------
+    def load_progress(self):
+        if SAVE_FILE.exists():
+            try:
+                data = json.loads(SAVE_FILE.read_text(encoding="utf-8"))
+                self.xp = int(data.get("xp", 0))
+                self.completed_levels = list(data.get("completed_levels", []))
+                last_level = int(data.get("current_level", 1))
+                self.level_index = max(0, min(last_level - 1, len(LEVELS) - 1))
+            except (ValueError, TypeError, json.JSONDecodeError):
+                self.xp = 0
+                self.completed_levels = []
+                self.level_index = 0
+
+    def save_progress(self):
+        data = {
+            "xp": self.xp,
+            "completed_levels": self.completed_levels,
+            "current_level": self.current_level["id"],
+        }
+        SAVE_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+    # --------------------------------------------------------
+    # Oberfläche
+    # --------------------------------------------------------
+    def build_ui(self):
+        self.root.columnconfigure(0, weight=1)
+        self.root.rowconfigure(1, weight=1)
+
+        header = ttk.Frame(self.root, padding=12)
+        header.grid(row=0, column=0, sticky="ew")
+        header.columnconfigure(1, weight=1)
+
+        ttk.Label(
+            header,
+            text="DATAFLOW ANALYST",
+            font=("Arial", 22, "bold"),
+        ).grid(row=0, column=0, sticky="w")
+
+        self.status_label = ttk.Label(header, text="")
+        self.status_label.grid(row=0, column=1, sticky="e")
+
+        main = ttk.Frame(self.root, padding=(12, 0, 12, 12))
+        main.grid(row=1, column=0, sticky="nsew")
+        main.columnconfigure(0, weight=0)
+        main.columnconfigure(1, weight=1)
+        main.rowconfigure(0, weight=1)
+
+        # Linke Seite: Aufgabe
+        task_frame = ttk.LabelFrame(main, text="Aufgabe", padding=12)
+        task_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        task_frame.configure(width=330)
+
+        self.level_label = ttk.Label(task_frame, text="", font=("Arial", 16, "bold"))
+        self.level_label.pack(anchor="w", pady=(0, 10))
+
+        self.task_title = ttk.Label(task_frame, text="", font=("Arial", 13, "bold"), wraplength=290)
+        self.task_title.pack(anchor="w", pady=(0, 10))
+
+        self.task_description = tk.Text(task_frame, height=10, width=34, wrap="word", relief="flat")
+        self.task_description.pack(fill="both", expand=True)
+        self.task_description.configure(state="disabled")
+
+        self.hint_button = ttk.Button(task_frame, text="Hinweis anzeigen", command=self.show_hint)
+        self.hint_button.pack(fill="x", pady=(10, 5))
+
+        # Rechte Seite: Editor + Output
+        right = ttk.Frame(main)
+        right.grid(row=0, column=1, sticky="nsew")
+        right.rowconfigure(1, weight=1)
+        right.rowconfigure(4, weight=0)
+        right.columnconfigure(0, weight=1)
+
+        ttk.Label(right, text="Python Editor", font=("Arial", 13, "bold")).grid(
+            row=0, column=0, sticky="w", pady=(0, 5)
+        )
+
+        editor_frame = ttk.Frame(right)
+        editor_frame.grid(row=1, column=0, sticky="nsew")
+        editor_frame.rowconfigure(0, weight=1)
+        editor_frame.columnconfigure(0, weight=1)
+
+        self.editor = tk.Text(
+            editor_frame,
+            font=("Consolas", 12),
+            undo=True,
+            wrap="none",
+        )
+        self.editor.grid(row=0, column=0, sticky="nsew")
+
+        editor_scroll = ttk.Scrollbar(editor_frame, orient="vertical", command=self.editor.yview)
+        editor_scroll.grid(row=0, column=1, sticky="ns")
+        self.editor.configure(yscrollcommand=editor_scroll.set)
+
+        controls = ttk.Frame(right)
+        controls.grid(row=2, column=0, sticky="ew", pady=10)
+        controls.columnconfigure(0, weight=1)
+
+        self.run_button = ttk.Button(controls, text="▶ CODE AUSFÜHREN", command=self.run_code)
+        self.run_button.grid(row=0, column=0, sticky="w")
+
+        self.reset_button = ttk.Button(controls, text="Code zurücksetzen", command=self.reset_code)
+        self.reset_button.grid(row=0, column=1, padx=(8, 0))
+
+        self.next_button = ttk.Button(controls, text="Nächstes Level ▶", command=self.next_level)
+        self.next_button.grid(row=0, column=2, padx=(8, 0))
+        self.next_button.state(["disabled"])
+
+        ttk.Label(right, text="Output", font=("Arial", 13, "bold")).grid(
+            row=3, column=0, sticky="w", pady=(5, 5)
+        )
+
+        self.output = tk.Text(
+            right,
+            height=10,
+            font=("Consolas", 11),
+            wrap="word",
+        )
+        self.output.grid(row=4, column=0, sticky="ew")
+        self.output.configure(state="disabled")
+
+        self.progress = ttk.Progressbar(right, mode="determinate", maximum=len(LEVELS))
+        self.progress.grid(row=5, column=0, sticky="ew", pady=(10, 0))
+
+    # --------------------------------------------------------
+    # Level-Logik
+    # --------------------------------------------------------
+    @property
+    def current_level(self):
+        return LEVELS[self.level_index]
+
+    def update_level_view(self):
+        level = self.current_level
+        self.level_label.configure(text=f"LEVEL {level['id']} / {len(LEVELS)}")
+        self.task_title.configure(text=level["title"])
+
+        self.task_description.configure(state="normal")
+        self.task_description.delete("1.0", tk.END)
+        self.task_description.insert("1.0", level["description"])
+        self.task_description.configure(state="disabled")
+
+        self.editor.delete("1.0", tk.END)
+        self.editor.insert("1.0", level["starter"])
+
+        self.clear_output()
+        self.next_button.state(["disabled"])
+        self.run_button.state(["!disabled"])
+        self.status_label.configure(text=f"XP: {self.xp}")
+        self.progress["value"] = len(self.completed_levels)
+
+    def reset_code(self):
+        self.editor.delete("1.0", tk.END)
+        self.editor.insert("1.0", self.current_level["starter"])
+        self.clear_output()
+
+    def show_hint(self):
+        messagebox.showinfo("Hinweis", self.current_level["hint"])
+
+    def next_level(self):
+        if self.level_index >= len(LEVELS) - 1:
+            messagebox.showinfo(
+                "Prototyp abgeschlossen",
+                "Du hast alle drei Prototyp-Level abgeschlossen.\n\n"
+                "Als Nächstes können wir weitere Data-Wrangling-Level hinzufügen.",
+            )
+            return
+
+        self.level_index += 1
+        self.save_progress()
+        self.update_level_view()
+
+    # --------------------------------------------------------
+    # Code-Ausführung
+    # --------------------------------------------------------
+    def run_code(self):
+        if self.running:
+            return
+
+        code = self.editor.get("1.0", tk.END).strip()
+        if not code:
+            self.show_result("❌ Bitte schreibe zuerst Python-Code in den Editor.")
+            return
+
+        if not DATA_FILE.exists():
+            self.show_result(
+                "❌ Die Datei data/orders.xlsx wurde nicht gefunden.\n\n"
+                f"Gesucht wurde hier:\n{DATA_FILE}"
+            )
+            return
+
+        self.running = True
+        self.run_button.state(["disabled"])
+        self.clear_output()
+        self.show_result("Code wird ausgeführt ...\n")
+
+        thread = threading.Thread(target=self.execute_code_in_process, args=(code,), daemon=True)
+        thread.start()
+
+    def execute_code_in_process(self, code: str):
+        temp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                suffix=".py",
+                delete=False,
+                encoding="utf-8",
+            ) as temp_file:
+                temp_path = temp_file.name
+                temp_file.write(code)
+
+            result = subprocess.run(
+                [sys.executable, temp_path],
+                cwd=BASE_DIR,
+                capture_output=True,
+                text=True,
+                timeout=8,
+            )
+
+            stdout = result.stdout
+            stderr = result.stderr
+
+            self.root.after(0, lambda: self.handle_execution_result(stdout, stderr, result.returncode))
+
+        except subprocess.TimeoutExpired:
+            self.root.after(
+                0,
+                lambda: self.handle_execution_result(
+                    "",
+                    "Zeitüberschreitung: Dein Programm lief länger als 8 Sekunden.",
+                    1,
+                ),
+            )
+        except Exception as exc:
+            self.root.after(
+                0,
+                lambda: self.handle_execution_result("", f"Interner Fehler: {exc}", 1),
+            )
+        finally:
+            if temp_path:
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    pass
+
+    def handle_execution_result(self, stdout: str, stderr: str, returncode: int):
+        self.running = False
+        self.run_button.state(["!disabled"])
+
+        combined = stdout
+        if stderr:
+            combined += ("\n" if combined else "") + stderr
+
+        if returncode != 0:
+            self.show_result("❌ FEHLER\n\n" + combined)
+            return
+
+        self.show_result(combined if combined.strip() else "(Keine Ausgabe)")
+
+        try:
+            solved = self.current_level["check"](stdout)
+        except Exception:
+            solved = False
+
+        if solved:
+            self.handle_success()
+        else:
+            self.show_result(
+                (combined if combined.strip() else "(Keine Ausgabe)")
+                + "\n\n❌ Aufgabe noch nicht korrekt gelöst."
+            )
+
+    def handle_success(self):
+        level_id = self.current_level["id"]
+        if level_id not in self.completed_levels:
+            self.completed_levels.append(level_id)
+            self.xp += self.current_level["xp"]
+            self.save_progress()
+
+        self.status_label.configure(text=f"XP: {self.xp}")
+        self.progress["value"] = len(self.completed_levels)
+        self.next_button.state(["!disabled"])
+
+        self.show_result(
+            "✅ AUFGABE GELÖST!\n\n"
+            f"+{self.current_level['xp']} XP\n"
+            f"Gesamt-XP: {self.xp}"
+        )
+
+    # --------------------------------------------------------
+    # Output
+    # --------------------------------------------------------
+    def clear_output(self):
+        self.output.configure(state="normal")
+        self.output.delete("1.0", tk.END)
+        self.output.configure(state="disabled")
+
+    def show_result(self, text: str):
+        self.output.configure(state="normal")
+        self.output.delete("1.0", tk.END)
+        self.output.insert("1.0", text)
+        self.output.configure(state="disabled")
+
+
+def main():
+    root = tk.Tk()
+    app = DataFlowGame(root)
+    root.mainloop()
+
+
+if __name__ == "__main__":
+    main()
